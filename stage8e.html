@@ -76,6 +76,30 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&
 const short=s=>s?s.slice(0,10)+'…'+s.slice(-8):'—';
 const eth=v=>(Number(v||0)/1e18).toFixed(5);
 
+// Stage 8E.1: tolerate timestamp names/formats returned by the backend.
+function txTime(t){
+  const raw=t?.timestamp??t?.time??t?.block_timestamp??t?.blockTimestamp??
+            t?.datetime??t?.date??t?.created_at??t?.createdAt??null;
+  if(raw===null||raw===undefined||raw==='') return 'Unknown time';
+  const n=Number(raw);
+  if(Number.isFinite(n)&&n>1000000000){
+    const ms=n<100000000000?n*1000:n;
+    return new Date(ms).toISOString().replace('T',' ').replace('.000Z',' UTC');
+  }
+  const d=new Date(raw);
+  return Number.isNaN(d.getTime())?String(raw):
+    d.toISOString().replace('T',' ').replace('.000Z',' UTC');
+}
+
+function evidenceType(e){
+  const raw=String(e?.evidence_type??e?.type??'').toLowerCase();
+  if(raw.includes('risk')||raw.includes('alert')||raw.includes('indicator')) return 'Risk indicator';
+  if(raw.includes('case')||raw.includes('metadata')) return 'Case metadata';
+  if(raw.includes('transaction')||raw.includes('tx')) return 'Transaction';
+  if(e?.hash||e?.from||e?.to||e?.value!==undefined) return 'Transaction';
+  return 'Other evidence';
+}
+
 async function api(path,opts={}){
  const r=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts});
  let d={};try{d=await r.json()}catch{}
@@ -96,7 +120,10 @@ async function loadCase(){
 function level(r){return r>=70?'CRITICAL':r>=50?'HIGH':r>=30?'MEDIUM':'LOW'}
 function render(){
  const c=current,tx=c.transactions||[],ev=c.evidence||[],alerts=c.alerts||[];
- $('mCase').textContent=c.case_id;$('mRisk').textContent=c.risk+'/100';$('mTx').textContent=tx.length;$('mEv').textContent=ev.length;
+ $('mCase').textContent=c.case_id;
+ $('mRisk').textContent=c.risk+'/100';
+ $('mTx').textContent=tx.length;
+ $('mEv').textContent=ev.filter(e=>evidenceType(e)!=='Other evidence').length;
  $('riskBox').innerHTML=`<div class="badge ${level(c.risk).toLowerCase()}">${level(c.risk)}</div>
  <div style="font-size:42px;font-weight:800;margin:5px 0">${c.risk}<small>/100</small></div>
  <div class="sub">Case-level risk score from the Stage 8D backend heuristic engine.</div>
@@ -104,7 +131,7 @@ function render(){
 
  $('timeline').innerHTML=tx.slice().sort((a,b)=>String(a.timestamp||'').localeCompare(String(b.timestamp||''))).map(t=>{
  const a=alerts.find(x=>x.address===t.from||x.address===t.to);const l=a?level(a.score||0):'LOW';
- return `<div class="event ${l.toLowerCase()}"><div class="time">${esc(t.timestamp||'Unknown time')} · <span class="badge ${l.toLowerCase()}">${l}</span></div>
+ return `<div class="event ${l.toLowerCase()}"><div class="time">${esc(txTime(t))} · <span class="badge ${l.toLowerCase()}">${l}</span></div>
  <div><b>${short(t.from)}</b> → <b>${short(t.to)}</b> · ${eth(t.value)} ETH</div><div class="mono sub">${esc(t.hash)}</div></div>`
  }).join('')||'<div class="empty">No transactions.</div>';
 
@@ -113,10 +140,17 @@ function render(){
  <span class="badge ${String(a.level).toLowerCase()}">${esc(a.level)}</span> <b>${esc(a.title)}</b>
  <div class="mono sub">${esc(a.address||'')}</div><div>${esc(a.reason)}</div></div>`).join(''):'<div class="empty">No elevated indicators.</div>';
 
- $('evidence').innerHTML=ev.map(e=>`<tr><td><b>${esc(e.evidence_id)}</b></td><td>${esc(e.evidence_type)}</td>
- <td class="mono">${esc(e.reference)}</td><td>${esc(e.source)}</td><td>${esc(e.retrieved_at)}</td></tr>`).join('')||'<tr><td colspan="5">No evidence.</td></tr>';
+ $('evidence').innerHTML=ev.map((e,i)=>{
+ const typ=evidenceType(e);
+ const ref=e.reference??e.hash??e.tx_hash??e.transaction_hash??e.address??'—';
+ const source=e.source??e.data_source??'ChainSight / backend';
+ const retrieved=e.retrieved_at??e.retrievedAt??e.timestamp??'—';
+ const eid=e.evidence_id??e.id??`EV-${String(i+1).padStart(4,'0')}`;
+ return `<tr><td><b>${esc(eid)}</b></td><td>${esc(typ)}</td>
+ <td class="mono">${esc(ref)}</td><td>${esc(source)}</td><td>${esc(retrieved)}</td></tr>`;
+ }).join('')||'<tr><td colspan="5">No evidence.</td></tr>';
 
- $('txs').innerHTML=tx.map(t=>`<tr><td>${esc(t.timestamp||'—')}</td><td class="mono">${esc(short(t.hash))}</td>
+ $('txs').innerHTML=tx.map(t=>`<tr><td>${esc(txTime(t))}</td><td class="mono">${esc(short(t.hash))}</td>
  <td class="mono">${esc(short(t.from))}</td><td class="mono">${esc(short(t.to))}</td><td>${eth(t.value)}</td></tr>`).join('')||'<tr><td colspan="5">No transactions.</td></tr>';
 }
 function buildPaths(tx,root){
