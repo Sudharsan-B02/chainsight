@@ -54,117 +54,421 @@ function addDemoButton(){const panel=document.querySelector('#dashboard .top');i
 async function runInvestigation(){const q=$('query').value.trim().toLowerCase();const d=Number($('depth').value);const st=$('traceStatus');st.style.display='block';if(/^0x[a-f0-9]{64}$/.test(q)){try{st.textContent='Looking up transaction hash…';await loadTransaction(q,d);st.style.display='none';showView('dashboard',document.querySelector('.nav button'));return}catch(e){st.textContent='Transaction lookup failed: '+e.message;return}}if(!/^0x[a-f0-9]{40}$/.test(q)){st.textContent='Enter a valid Ethereum wallet address (0x + 40 hex) or transaction hash (0x + 64 hex).';return}try{st.textContent='Querying Ethereum…';await loadWallet(q,d);st.style.display='none';showView('dashboard',document.querySelector('.nav button'))}catch(e){st.textContent='Live lookup failed: '+e.message+'. Try again or verify the address.'}}
 function downloadReport(){
 const subject=esc(state.root||'Unknown');
-const risk=esc(state.risk+'/100');
-const trace=esc(state.depth+' hops / '+state.nodes.size+' nodes');
-const alerts=state.alerts.length
-?state.alerts.map(a=>`<tr>
-<td>${esc(a.level)}</td>
-<td>${esc(a.title)}</td>
-<td class="mono">${esc(a.addr)}</td>
-<td>${esc(a.reason)}</td>
-</tr>`).join('')
-:'<tr><td colspan="4">No elevated risk indicators detected.</td></tr>';
+const risk=Number(state.risk||0);
+const trace=esc(`${state.depth} hops / ${state.nodes.size} nodes`);
+const generated=new Date().toISOString();
+const totalValue=(state.txs.reduce((s,t)=>s+t.value,0)/1e18).toFixed(5);
+const riskLevel=risk>=70?'CRITICAL':risk>=50?'HIGH':risk>=30?'MEDIUM':'LOW';
 
-const evidence=state.txs.slice(0,100).map(t=>`
+const alerts=state.alerts.length
+?state.alerts.map((a,i)=>`
+<article class="alert ${String(a.level).toLowerCase()}">
+<div class="alertHead">
+<span class="badge">${esc(a.level)}</span>
+<strong>${esc(a.title)}</strong>
+<span class="alertNo">#${i+1}</span>
+</div>
+<div class="mono addr">${esc(a.addr)}</div>
+<p>${esc(a.reason)}</p>
+</article>`).join('')
+:'<div class="empty">No elevated risk indicators detected by the current heuristic engine.</div>';
+
+const evidence=state.txs.slice(0,100).map((t,i)=>{
+const r=scoreNode(t.from,state.txs);
+const level=r>=70?'HIGH':r>=30?'MEDIUM':'LOW';
+
+return `
 <tr>
+<td>${i+1}</td>
 <td>${esc(t.time||'—')}</td>
-<td class="mono">${esc(t.hash)}</td>
-<td class="mono">${esc(t.from)}</td>
-<td class="mono">${esc(t.to)}</td>
+<td class="mono">${esc(short(t.hash))}</td>
+<td class="mono">${esc(short(t.from))}</td>
+<td class="mono">${esc(short(t.to))}</td>
 <td>${eth(t.value)} ETH</td>
-</tr>`).join('');
+<td>
+<span class="status ${level.toLowerCase()}">${level}</span>
+</td>
+</tr>`;
+}).join('')||`
+<tr>
+<td colspan="7">No transaction records available.</td>
+</tr>`;
+
+const graph=$('svg')?.outerHTML||'';
 
 const html=`<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ChainSight Investigation Report</title>
+
 <style>
+:root{
+--bg:#f5f7f9;
+--ink:#17212b;
+--muted:#63717d;
+--line:#d9e0e5;
+--panel:#fff;
+--accent:#0f766e;
+--danger:#c92d4b;
+--warn:#a05a00
+}
+
+*{box-sizing:border-box}
+
 body{
-font-family:Arial,sans-serif;
-max-width:1100px;
-margin:40px auto;
-padding:0 25px;
-color:#17212b;
-line-height:1.5
+margin:0;
+background:var(--bg);
+color:var(--ink);
+font:14px/1.55 Arial,sans-serif
 }
-h1{margin-bottom:4px}
-h2{
-margin-top:30px;
-border-bottom:2px solid #ddd;
-padding-bottom:6px
+
+.page{
+max-width:1180px;
+margin:0 auto;
+padding:34px 28px 60px
 }
-.meta{
+
+.header{
+background:#0b1d29;
+color:#fff;
+border-radius:16px;
+padding:28px 30px;
+margin-bottom:18px
+}
+
+.brand{
+font-size:13px;
+letter-spacing:1.6px;
+text-transform:uppercase;
+color:#66d7c1;
+font-weight:700
+}
+
+.header h1{
+margin:7px 0 4px;
+font-size:30px
+}
+
+.header p{
+margin:0;
+color:#b8c6cf
+}
+
+.casebar{
+margin-top:22px;
+display:flex;
+gap:20px;
+flex-wrap:wrap
+}
+
+.casebar span{
+color:#dce7ec
+}
+
+.grid{
 display:grid;
-grid-template-columns:repeat(3,1fr);
-gap:12px
+grid-template-columns:repeat(4,1fr);
+gap:12px;
+margin:18px 0
 }
+
 .card{
-border:1px solid #ddd;
-border-radius:8px;
-padding:15px
+background:var(--panel);
+border:1px solid var(--line);
+border-radius:12px;
+padding:16px
 }
+
 .label{
-font-size:11px;
-color:#667;
-text-transform:uppercase
+font-size:10px;
+letter-spacing:1.2px;
+text-transform:uppercase;
+color:var(--muted);
+font-weight:700
 }
+
 .value{
 font-size:22px;
-font-weight:bold;
+font-weight:800;
 margin-top:5px
 }
+
+.section{
+margin-top:24px
+}
+
+.section h2{
+font-size:19px;
+margin:0 0 10px
+}
+
+.sectionIntro{
+color:var(--muted);
+margin:0 0 12px
+}
+
+.summary{
+display:grid;
+grid-template-columns:2fr 1fr;
+gap:12px
+}
+
+.notice{
+background:#fff8e8;
+border:1px solid #f0d59b;
+border-radius:10px;
+padding:15px
+}
+
+.notice strong{
+display:block;
+margin-bottom:4px
+}
+
+.alert{
+background:#fff;
+border:1px solid var(--line);
+border-left:5px solid var(--warn);
+border-radius:10px;
+padding:13px 15px;
+margin:9px 0
+}
+
+.alert.critical,
+.alert.high{
+border-left-color:var(--danger)
+}
+
+.alert.medium{
+border-left-color:#d08a1d
+}
+
+.alertHead{
+display:flex;
+align-items:center;
+gap:8px
+}
+
+.badge,
+.status{
+display:inline-block;
+border-radius:999px;
+padding:3px 8px;
+font-size:10px;
+font-weight:800;
+letter-spacing:.5px
+}
+
+.badge{
+background:#f3e8ea;
+color:#9d1835
+}
+
+.alertNo{
+margin-left:auto;
+color:#8997a1;
+font-size:11px
+}
+
+.alert p{
+margin:7px 0 0
+}
+
+.mono{
+font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+word-break:break-all
+}
+
+.addr{
+font-size:12px;
+color:#475866;
+margin-top:6px
+}
+
+.tableWrap{
+overflow:auto;
+background:#fff;
+border:1px solid var(--line);
+border-radius:12px
+}
+
 table{
 width:100%;
 border-collapse:collapse;
+min-width:900px
+}
+
+th,
+td{
+padding:9px 10px;
+border-bottom:1px solid var(--line);
+text-align:left;
 font-size:11px
 }
-th,td{
-border-bottom:1px solid #ddd;
-padding:8px;
-text-align:left
+
+th{
+background:#eef2f5;
+color:#44535e;
+font-size:10px;
+text-transform:uppercase;
+letter-spacing:.7px
 }
-th{background:#f1f4f6}
-.mono{
-font-family:monospace;
-word-break:break-all
+
+tr:last-child td{
+border-bottom:0
 }
-.warning{
-background:#fff4f4;
-border-left:4px solid #e44;
-padding:12px
+
+.status.low{
+background:#e3f6f1;
+color:#087563
 }
+
+.status.medium{
+background:#fff0d5;
+color:#8b5300
+}
+
+.status.high,
+.status.critical{
+background:#ffe5eb;
+color:#a31939
+}
+
+.graph{
+background:#06131c;
+border-radius:12px;
+padding:12px;
+overflow:auto
+}
+
+.graph svg{
+display:block;
+min-width:760px;
+width:100%;
+height:auto
+}
+
+.meta{
+display:grid;
+grid-template-columns:repeat(2,1fr);
+gap:10px
+}
+
+.empty{
+padding:18px;
+background:#fff;
+border:1px dashed var(--line);
+border-radius:10px;
+color:var(--muted)
+}
+
+footer{
+margin-top:30px;
+padding-top:15px;
+border-top:1px solid var(--line);
+font-size:11px;
+color:var(--muted)
+}
+
+@media(max-width:760px){
+.page{
+padding:18px 12px
+}
+
+.grid{
+grid-template-columns:repeat(2,1fr)
+}
+
+.summary,
+.meta{
+grid-template-columns:1fr
+}
+
+.header h1{
+font-size:24px
+}
+}
+
 @media print{
-body{margin:15px}
-button{display:none}
+body{
+background:#fff
+}
+
+.page{
+max-width:none;
+padding:0
+}
+
+.header{
+break-inside:avoid
+}
+
+.graph{
+break-inside:avoid
+}
 }
 </style>
 </head>
+
 <body>
 
-<h1>ChainSight Investigation Report</h1>
-<p>Cryptocurrency Transaction Intelligence & Investigation Platform</p>
+<main class="page">
 
-<div class="meta">
+<header class="header">
+
+<div class="brand">
+ChainSight · Crypto Intelligence & Investigation
+</div>
+
+<h1>Investigation Evidence Report</h1>
+
+<p>
+Live Ethereum transaction trace and explainable risk assessment.
+</p>
+
+<div class="casebar">
+
+<span>
+<b>Subject:</b>
+<span class="mono">${subject}</span>
+</span>
+
+<span>
+<b>Generated:</b>
+${esc(generated)}
+</span>
+
+<span>
+<b>Mode:</b>
+${esc(state.mode)}
+</span>
+
+</div>
+
+</header>
+
+<section class="grid">
 
 <div class="card">
-<div class="label">Investigation Subject</div>
-<div class="value mono">${subject}</div>
+<div class="label">Risk score</div>
+<div class="value">${risk}/100</div>
 </div>
 
 <div class="card">
-<div class="label">Risk Score</div>
-<div class="value">${risk}</div>
+<div class="label">Risk level</div>
+<div class="value">${esc(riskLevel)}</div>
 </div>
 
 <div class="card">
-<div class="label">Trace Scope</div>
+<div class="label">Trace scope</div>
 <div class="value">${trace}</div>
 </div>
 
 <div class="card">
-<div class="label">Wallets Observed</div>
-<div class="value">${state.nodes.size}</div>
+<div class="label">Value observed</div>
+<div class="value">${esc(totalValue)} ETH</div>
 </div>
 
 <div class="card">
@@ -173,82 +477,225 @@ button{display:none}
 </div>
 
 <div class="card">
-<div class="label">Value Observed</div>
-<div class="value">${(state.txs.reduce((s,t)=>s+t.value,0)/1e18).toFixed(5)} ETH</div>
+<div class="label">Wallets observed</div>
+<div class="value">${state.nodes.size}</div>
+</div>
+
+<div class="card">
+<div class="label">Risk indicators</div>
+<div class="value">${state.alerts.length}</div>
+</div>
+
+<div class="card">
+<div class="label">Data source</div>
+<div class="value" style="font-size:16px">
+${esc(state.source)}
+</div>
+</div>
+
+</section>
+
+<section class="section">
+
+<h2>Executive Summary</h2>
+
+<div class="summary">
+
+<div class="card">
+
+<p style="margin:0">
+
+The investigation traced
+<b>${state.txs.length}</b>
+transaction records across
+<b>${state.nodes.size}</b>
+observed addresses over
+<b>${esc(state.depth)} hop(s)</b>.
+
+The heuristic engine produced a root risk score of
+<b>${risk}/100 (${esc(riskLevel)})</b>
+and identified
+<b>${state.alerts.length}</b>
+risk indicators.
+
+</p>
+
+</div>
+
+<div class="notice">
+
+<strong>Interpretation</strong>
+
+Risk indicators are prioritization signals derived from
+transaction structure and activity. They are not proof
+of criminal conduct.
+
 </div>
 
 </div>
+
+</section>
+
+<section class="section">
+
+<h2>Transaction Spider Map</h2>
+
+<p class="sectionIntro">
+Directed graph captured from the current investigation state.
+</p>
+
+<div class="graph">
+${graph}
+</div>
+
+</section>
+
+<section class="section">
 
 <h2>Risk Indicators</h2>
 
-<table>
-<thead>
-<tr>
-<th>Level</th>
-<th>Indicator</th>
-<th>Wallet</th>
-<th>Reason</th>
-</tr>
-</thead>
-<tbody>
+<p class="sectionIntro">
+Explainable heuristics generated from the observed transaction set.
+</p>
+
 ${alerts}
-</tbody>
-</table>
+
+</section>
+
+<section class="section">
 
 <h2>Transaction Evidence</h2>
 
+<p class="sectionIntro">
+The first 100 normalized transaction records are included
+for evidence review.
+</p>
+
+<div class="tableWrap">
+
 <table>
+
 <thead>
+
 <tr>
+<th>#</th>
 <th>Timestamp</th>
-<th>Transaction Hash</th>
+<th>Transaction</th>
 <th>From</th>
 <th>To</th>
 <th>Amount</th>
+<th>Risk</th>
 </tr>
+
 </thead>
+
 <tbody>
 ${evidence}
 </tbody>
+
 </table>
 
-<h2>Evidence Boundary</h2>
-
-<div class="warning">
-<strong>Important:</strong>
-Blockchain records establish on-chain transaction facts.
-The risk score is an investigative prioritization signal and
-is not proof of criminal conduct.
-A blockchain transaction does not inherently reveal a user's
-IP address or real-world identity. Any identity or IP
-correlation requires separate lawful and authorized
-off-chain intelligence.
 </div>
+
+</section>
+
+<section class="section">
+
+<h2>Evidence Boundary & Methodology</h2>
+
+<div class="notice">
+
+<strong>Evidence boundary</strong>
+
+On-chain records establish transaction facts.
+A transaction hash or wallet address does not inherently
+reveal a user's IP address or real-world identity.
+
+Any identity or IP correlation requires separate lawful
+and authorized off-chain intelligence.
+
+<br><br>
+
+<strong>Methodology</strong>
+
+Risk scores are generated by ChainSight's explainable
+heuristic engine using observed transaction count,
+counterparty count, outgoing activity, and rapid
+transaction timing.
+
+The score supports analyst prioritization and does not
+establish attribution.
+
+</div>
+
+</section>
+
+<section class="section">
 
 <h2>Data Provenance</h2>
 
-<p>
-<strong>Mode:</strong> ${esc(state.mode)}<br>
-<strong>Source:</strong> ${esc(state.source)}<br>
-<strong>Generated:</strong> ${new Date().toISOString()}
-</p>
+<div class="meta">
 
-<p>
-ChainSight — Crypto Intelligence & Investigation Platform
-</p>
+<div class="card">
+<div class="label">Source</div>
+<div style="margin-top:6px">
+${esc(state.source)}
+</div>
+</div>
+
+<div class="card">
+<div class="label">Generation time</div>
+<div class="mono" style="margin-top:6px">
+${esc(generated)}
+</div>
+</div>
+
+<div class="card">
+<div class="label">Trace depth</div>
+<div style="margin-top:6px">
+${esc(state.depth)} hops
+</div>
+</div>
+
+<div class="card">
+<div class="label">Records included</div>
+<div style="margin-top:6px">
+${state.txs.length} normalized transactions
+</div>
+</div>
+
+</div>
+
+</section>
+
+<footer>
+
+ChainSight Investigation Report ·
+For authorized investigative and academic use.
+Data shown reflects the state available when this report
+was generated.
+
+</footer>
+
+</main>
 
 </body>
 </html>`;
 
 const blob=new Blob([html],{type:'text/html'});
 const url=URL.createObjectURL(blob);
+
 const a=document.createElement('a');
 a.href=url;
-a.download='ChainSight-Investigation-Report.html';
+a.download='ChainSight-Investigation-Evidence-Report.html';
+
 document.body.appendChild(a);
 a.click();
 a.remove();
+
+setTimeout(()=>{
 URL.revokeObjectURL(url);
+},1000);
 }
 addDemoButton();
 function updateReport8B(){
