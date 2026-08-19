@@ -1,29 +1,34 @@
 # ChainSight — Crypto Intelligence & Investigation Platform
 
-ChainSight is a research/hackathon prototype for cryptocurrency transaction analysis and investigation.
+Live-upgrade package for the ChainSight hackathon prototype.
 
-## GitHub Pages
+## What changed
 
-The repository is configured for GitHub Pages. Push to `main` and `.github/workflows/deploy.yml` deploys the site.
+- Live Ethereum wallet transaction retrieval via Blockscout API
+- 1–3 hop wallet tracing
+- Directed transaction spider map
+- Explainable risk heuristics
+- Live transaction evidence table
+- Risk alerts
+- Investigation report export
 
-Expected URL: `https://sudharsan-b02.github.io/chainsight/`
+## Deployment
 
-## Features
-- Investigation dashboard
-- Interactive wallet spider map
-- Wallet risk profiles
-- Explainable suspicious-pattern alerts
-- Investigation workflow
-- Report export
-- Methodology and evidence-boundary documentation
+Upload `index.html`, `app.js`, and `README.md` to the root of the
+`Sudharsan-B02/chainsight` repository and commit to `main`.
 
-## Research basis
-The prototype follows the graph/ML forensic direction of Pocher et al. (2023), "Detecting Anomalous Cryptocurrency Transactions: an AML/CFT Application of Machine Learning-based Forensics."
+GitHub Pages can continue using `main` + `/ (root)`.
 
-## Current limitation
-The included blockchain records are synthetic demonstration data. The interface is designed for replacement with real blockchain API/RPC data.
+## Important limitations
 
-A blockchain transaction does not inherently contain a user's IP address. Any IP/identity correlation must come from lawful, authorized off-chain intelligence and must retain provenance and confidence metadata.
+The browser implementation retrieves public Ethereum on-chain data. The
+risk score is an investigative prioritization signal, not proof of criminal
+conduct.
 
-## Production architecture
-Blockchain API/RPC → FastAPI → PostgreSQL → graph/feature pipeline → risk engine/ML → ChainSight dashboard.
+A blockchain transaction does not inherently reveal a user's IP address.
+Any IP/identity correlation requires separate lawful, authorized off-chain
+intelligence.
+
+The next production stage should add a FastAPI backend, persistent database,
+authentication/rate limiting, provenance logging, and the GCN/GAT research
+pipeline.
