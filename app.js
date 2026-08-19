@@ -52,5 +52,202 @@ async function loadWallet(addr,depth){
 async function loadTransaction(hash,depth){const tx=normalizeTx(await api(`/transactions/${hash}`));if(!tx.from)throw new Error('Transaction was not found or has no sender');state.root=tx.from;let all=[tx];const seeds=[tx.from,tx.to].filter(Boolean);for(const a of seeds.slice(0,2)){all.push(...await fetchAddress(a))}const uniq=[...new Map(all.filter(t=>t.hash).map(t=>[t.hash,t])).values()];state.mode='live';state.source='Ethereum transaction / Blockscout API';state.depth=Math.min(depth,1);state.txs=uniq;buildGraph(uniq,state.root);populateCase()}
 function addDemoButton(){const panel=document.querySelector('#dashboard .top');if(panel&&!document.getElementById('demoBtn')){const b=document.createElement('button');b.id='demoBtn';b.className='btn';b.textContent='Load Demo Case';b.onclick=loadDemo;panel.appendChild(b)}const inv=document.querySelector('#investigate .controls');if(inv&&!document.getElementById('demoBtn2')){const b=document.createElement('button');b.id='demoBtn2';b.className='btn';b.textContent='Demo';b.onclick=loadDemo;inv.appendChild(b)}}
 async function runInvestigation(){const q=$('query').value.trim().toLowerCase();const d=Number($('depth').value);const st=$('traceStatus');st.style.display='block';if(/^0x[a-f0-9]{64}$/.test(q)){try{st.textContent='Looking up transaction hash…';await loadTransaction(q,d);st.style.display='none';showView('dashboard',document.querySelector('.nav button'));return}catch(e){st.textContent='Transaction lookup failed: '+e.message;return}}if(!/^0x[a-f0-9]{40}$/.test(q)){st.textContent='Enter a valid Ethereum wallet address (0x + 40 hex) or transaction hash (0x + 64 hex).';return}try{st.textContent='Querying Ethereum…';await loadWallet(q,d);st.style.display='none';showView('dashboard',document.querySelector('.nav button'))}catch(e){st.textContent='Live lookup failed: '+e.message+'. Try again or verify the address.'}}
-function downloadReport(){const html='<!doctype html><html><body style="font-family:Arial;max-width:900px;margin:40px auto"><h1>ChainSight Investigation Report</h1>'+$('reportContent').innerHTML+'<p>Source: '+esc(state.source)+'</p></body></html>';const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download='ChainSight-Investigation-Report.html';a.click()}
+function downloadReport(){
+const subject=esc(state.root||'Unknown');
+const risk=esc(state.risk+'/100');
+const trace=esc(state.depth+' hops / '+state.nodes.size+' nodes');
+const alerts=state.alerts.length
+?state.alerts.map(a=>`<tr>
+<td>${esc(a.level)}</td>
+<td>${esc(a.title)}</td>
+<td class="mono">${esc(a.addr)}</td>
+<td>${esc(a.reason)}</td>
+</tr>`).join('')
+:'<tr><td colspan="4">No elevated risk indicators detected.</td></tr>';
+
+const evidence=state.txs.slice(0,100).map(t=>`
+<tr>
+<td>${esc(t.time||'—')}</td>
+<td class="mono">${esc(t.hash)}</td>
+<td class="mono">${esc(t.from)}</td>
+<td class="mono">${esc(t.to)}</td>
+<td>${eth(t.value)} ETH</td>
+</tr>`).join('');
+
+const html=`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ChainSight Investigation Report</title>
+<style>
+body{
+font-family:Arial,sans-serif;
+max-width:1100px;
+margin:40px auto;
+padding:0 25px;
+color:#17212b;
+line-height:1.5
+}
+h1{margin-bottom:4px}
+h2{
+margin-top:30px;
+border-bottom:2px solid #ddd;
+padding-bottom:6px
+}
+.meta{
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:12px
+}
+.card{
+border:1px solid #ddd;
+border-radius:8px;
+padding:15px
+}
+.label{
+font-size:11px;
+color:#667;
+text-transform:uppercase
+}
+.value{
+font-size:22px;
+font-weight:bold;
+margin-top:5px
+}
+table{
+width:100%;
+border-collapse:collapse;
+font-size:11px
+}
+th,td{
+border-bottom:1px solid #ddd;
+padding:8px;
+text-align:left
+}
+th{background:#f1f4f6}
+.mono{
+font-family:monospace;
+word-break:break-all
+}
+.warning{
+background:#fff4f4;
+border-left:4px solid #e44;
+padding:12px
+}
+@media print{
+body{margin:15px}
+button{display:none}
+}
+</style>
+</head>
+<body>
+
+<h1>ChainSight Investigation Report</h1>
+<p>Cryptocurrency Transaction Intelligence & Investigation Platform</p>
+
+<div class="meta">
+
+<div class="card">
+<div class="label">Investigation Subject</div>
+<div class="value mono">${subject}</div>
+</div>
+
+<div class="card">
+<div class="label">Risk Score</div>
+<div class="value">${risk}</div>
+</div>
+
+<div class="card">
+<div class="label">Trace Scope</div>
+<div class="value">${trace}</div>
+</div>
+
+<div class="card">
+<div class="label">Wallets Observed</div>
+<div class="value">${state.nodes.size}</div>
+</div>
+
+<div class="card">
+<div class="label">Transactions</div>
+<div class="value">${state.txs.length}</div>
+</div>
+
+<div class="card">
+<div class="label">Value Observed</div>
+<div class="value">${(state.txs.reduce((s,t)=>s+t.value,0)/1e18).toFixed(5)} ETH</div>
+</div>
+
+</div>
+
+<h2>Risk Indicators</h2>
+
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Indicator</th>
+<th>Wallet</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+${alerts}
+</tbody>
+</table>
+
+<h2>Transaction Evidence</h2>
+
+<table>
+<thead>
+<tr>
+<th>Timestamp</th>
+<th>Transaction Hash</th>
+<th>From</th>
+<th>To</th>
+<th>Amount</th>
+</tr>
+</thead>
+<tbody>
+${evidence}
+</tbody>
+</table>
+
+<h2>Evidence Boundary</h2>
+
+<div class="warning">
+<strong>Important:</strong>
+Blockchain records establish on-chain transaction facts.
+The risk score is an investigative prioritization signal and
+is not proof of criminal conduct.
+A blockchain transaction does not inherently reveal a user's
+IP address or real-world identity. Any identity or IP
+correlation requires separate lawful and authorized
+off-chain intelligence.
+</div>
+
+<h2>Data Provenance</h2>
+
+<p>
+<strong>Mode:</strong> ${esc(state.mode)}<br>
+<strong>Source:</strong> ${esc(state.source)}<br>
+<strong>Generated:</strong> ${new Date().toISOString()}
+</p>
+
+<p>
+ChainSight — Crypto Intelligence & Investigation Platform
+</p>
+
+</body>
+</html>`;
+
+const blob=new Blob([html],{type:'text/html'});
+const url=URL.createObjectURL(blob);
+const a=document.createElement('a');
+a.href=url;
+a.download='ChainSight-Investigation-Report.html';
+document.body.appendChild(a);
+a.click();
+a.remove();
+URL.revokeObjectURL(url);
+}
 addDemoButton();
