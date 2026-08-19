@@ -223,21 +223,168 @@ function render(){
  <td class="mono">${esc(short(t.from))}</td><td class="mono">${esc(short(t.to))}</td><td>${eth(t.value)}</td></tr>`).join('')||'<tr><td colspan="5">No transactions.</td></tr>';
 }
 function buildPaths(tx,root){
- const adj=new Map();
- for(const t of tx){if(!adj.has(t.from))adj.set(t.from,[]);adj.get(t.from).push(t.to)}
- const paths=[];
- for(const first of (adj.get(root)||[]).slice(0,8)){
-  const second=(adj.get(first)||[])[0];
-  paths.push([root,first,...(second&&second!==root?[second]:[])]);
- }
- if(!paths.length){
-  const peer=tx.find(t=>t.from===root)?.to;
-  return peer?`<div class="path"><div class="node"><b>ROOT</b><div class="mono">${short(root)}</div></div>
-  <div class="arrow">→</div><div class="node"><b>Counterparty</b><div class="mono">${short(peer)}</div></div></div>`:
-  '<div class="empty">No direct paths from the case subject.</div>';
- }
- return paths.map((p,i)=>`<div style="margin:10px 0"><div class="sub">Path ${i+1}</div><div class="path">
- ${p.map((x,j)=>`${j?'<div class="arrow">→</div>':''}<div class="node"><b>${j===0?'ROOT':'Hop '+j}</b><div class="mono">${short(x)}</div></div>`).join('')}</div></div>`).join('');
+
+  if(!root){
+    return '<div class="empty">No case subject available.</div>';
+  }
+
+  // Build outgoing transaction index.
+  const outgoing=new Map();
+
+  for(const t of tx){
+    if(!t?.from || !t?.to) continue;
+
+    if(!outgoing.has(t.from)){
+      outgoing.set(t.from,[]);
+    }
+
+    outgoing.get(t.from).push(t);
+  }
+
+  // Keep paths evidence-linked.
+  const paths=[];
+
+  function walk(address,pathTx,visited,depth){
+
+    if(depth>=3){
+      if(pathTx.length){
+        paths.push(pathTx);
+      }
+      return;
+    }
+
+    const next=outgoing.get(address)||[];
+
+    for(const t of next.slice(0,8)){
+
+      if(visited.has(t.to)){
+        continue;
+      }
+
+      const nextPath=[...pathTx,t];
+
+      paths.push(nextPath);
+
+      const nextVisited=new Set(visited);
+      nextVisited.add(t.to);
+
+      walk(t.to,nextPath,nextVisited,depth+1);
+    }
+  }
+
+  walk(root,[],new Set([root]),0);
+
+  // Remove duplicate paths.
+  const unique=[];
+  const seen=new Set();
+
+  for(const path of paths){
+
+    const key=path.map(t=>t.hash||`${t.from}-${t.to}`).join('|');
+
+    if(!seen.has(key)){
+      seen.add(key);
+      unique.push(path);
+    }
+  }
+
+  const selected=unique.slice(0,8);
+
+  if(!selected.length){
+
+    const direct=tx.find(t=>t.from===root);
+
+    if(!direct){
+      return '<div class="empty">No direct transaction path from the case subject.</div>';
+    }
+
+    return `
+      <div style="margin:10px 0">
+        <div class="sub">Direct transaction</div>
+
+        <div class="path">
+
+          <div class="node">
+            <b>ROOT</b>
+            <div class="mono">${short(root)}</div>
+          </div>
+
+          <div class="arrow">→</div>
+
+          <div class="node">
+            <b>Hop 1</b>
+            <div class="mono">${short(direct.to)}</div>
+          </div>
+
+        </div>
+
+        <div class="sub mono">
+          TX: ${esc(direct.hash||'Unknown hash')}
+        </div>
+
+      </div>
+    `;
+  }
+
+  return selected.map((path,index)=>{
+
+    const nodes=[];
+
+    // Root node.
+    nodes.push(`
+      <div class="node">
+        <b>ROOT</b>
+        <div class="mono">${short(root)}</div>
+      </div>
+    `);
+
+    path.forEach((t,j)=>{
+
+      const hop=j+1;
+
+      nodes.push(`
+        <div class="arrow">→</div>
+
+        <div class="node">
+
+          <b>Hop ${hop}</b>
+
+          <div class="mono">
+            ${short(t.to)}
+          </div>
+
+          <div class="sub" style="margin-top:6px">
+            ${esc(txTime(t))}
+          </div>
+
+          <div class="sub">
+            ${eth(t.value)} ETH
+          </div>
+
+          <div class="mono sub" style="margin-top:5px">
+            TX: ${esc(t.hash||'Unknown')}
+          </div>
+
+        </div>
+      `);
+
+    });
+
+    return `
+      <div style="margin:14px 0">
+
+        <div class="sub">
+          Path ${index+1} · ${path.length} hop${path.length===1?'':'s'}
+        </div>
+
+        <div class="path">
+          ${nodes.join('')}
+        </div>
+
+      </div>
+    `;
+
+  }).join('');
 }
 function saveNotes(){
  if(!current)return;
