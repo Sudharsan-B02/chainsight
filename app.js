@@ -55,7 +55,35 @@ async function runInvestigation(){const q=$('query').value.trim().toLowerCase();
 function downloadReport(){
 const subject=esc(state.root||'Unknown');
 const risk=Number(state.risk||0);
-const trace=esc(`${state.depth} hops / ${state.nodes.size} nodes`);
+const hopText=state.depth===1?'hop':'hops';
+const trace=esc(`${state.depth} ${hopText} / ${state.nodes.size} nodes`);
+
+const criticalCount=state.alerts.filter(
+a=>String(a.level).toUpperCase()==='CRITICAL'
+).length;
+
+const highCount=state.alerts.filter(
+a=>String(a.level).toUpperCase()==='HIGH'
+).length;
+
+const mediumCount=state.alerts.filter(
+a=>String(a.level).toUpperCase()==='MEDIUM'
+).length;
+
+let conclusion='No elevated risk indicators were detected.';
+
+if(risk>=70){
+conclusion='The traced subject shows a critical level of transaction risk. Multiple structural indicators warrant immediate analyst review and deeper authorized investigation.';
+}else if(risk>=50){
+conclusion='The traced subject shows a high level of transaction risk. The observed transaction structure warrants further investigation.';
+}else if(risk>=30){
+conclusion='The traced subject shows a medium level of transaction risk. The observed indicators should be reviewed in the context of the complete transaction history.';
+}
+
+const investigationType=
+state.mode==='live'
+?'Live Ethereum investigation'
+:'Synthetic demonstration investigation';
 const generated=new Date().toISOString();
 const totalValue=(state.txs.reduce((s,t)=>s+t.value,0)/1e18).toFixed(5);
 const riskLevel=risk>=70?'CRITICAL':risk>=50?'HIGH':risk>=30?'MEDIUM':'LOW';
