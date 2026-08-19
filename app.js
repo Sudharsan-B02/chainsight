@@ -16,8 +16,39 @@ function renderTable(){const rows=state.txs.slice(0,40);$('txTable').innerHTML=r
 function renderStats(){ $('statNodes').textContent=state.nodes.size; $('statTx').textContent=state.txs.length; $('statAlerts').textContent=state.alerts.length; $('statValue').textContent=(state.txs.reduce((s,t)=>s+t.value,0)/1e18).toFixed(2)+' ETH'; $('patternBox').innerHTML=`<div style="margin-bottom:8px"><span class="status ${state.mode==='live'?'low':'medium'}">${state.mode==='live'?'LIVE ETHEREUM':'DEMO CASE'}</span></div>`+(state.alerts.length?state.alerts.slice(0,5).map(a=>`<div class="alert"><b>${a.level} · ${esc(a.title)}</b><span class="mono">${esc(short(a.addr))}</span> — ${esc(a.reason)}</div>`).join(''):'No elevated patterns detected by the current heuristic engine.');$('alertsList').innerHTML=state.alerts.length?state.alerts.map(a=>`<div class="alert"><b>${a.level} · ${esc(a.title)}</b><span class="mono">${esc(a.addr)}</span> — ${esc(a.reason)}</div>`).join(''):'<div class="hint">No elevated patterns detected.</div>';const badge=$('liveBadge');badge.textContent=state.mode==='live'?'● LIVE ETHEREUM · API CONNECTED':'● DEMO CASE · LIVE API READY';badge.style.color=state.mode==='live'?'#55d6be':'#ffbd59';const sub=$('dashSub');if(sub)sub.textContent=state.mode==='live'?'Live cryptocurrency transaction intelligence.':'Demonstration investigation loaded. Run a live trace for real Ethereum data.'}
 function populateCase(){renderStats();renderGraph();renderTable();selectNode(state.nodes.get(state.root)||[...state.nodes.values()][0]);$('investigationResult').style.display='block';$('liveDepth').textContent=state.depth+' hops';$('liveNodes').textContent=state.nodes.size;$('liveAlerts').textContent=state.alerts.length;$('liveRisk').textContent=state.risk+'/100';$('liveSummary').textContent=`${state.mode==='live'?'Retrieved':'Loaded'} ${state.txs.length} transactions across ${state.nodes.size} observed addresses.`;$('reportSubject').textContent=state.root;$('reportRisk').textContent=state.risk+'/100';$('reportTrace').textContent=`${state.depth} hops / ${state.nodes.size} nodes`}
 function loadDemo(){const d=makeDemo();state.mode='demo';state.source='Synthetic demonstration case';state.root=d.root;state.depth=3;state.txs=d.txs;buildGraph(state.txs,state.root);populateCase();showView('dashboard',document.querySelector('.nav button'))}
-async function fetchAddress(addr){const data=await api(`/addresses/${addr}/transactions?filter=validated&page_size=100`);return (data.items||[]).map(normalizeTx)}
-async function loadWallet(addr,depth){state.root=addr.toLowerCase();let all=[],front=[state.root],seen=new Set(front);for(let d=0;d<depth;d++){const next=new Set();for(const a of front){const txs=await fetchAddress(a);all.push(...txs);txs.forEach(t=>{[t.from,t.to].forEach(x=>{if(x&&!seen.has(x)&&x!==state.root){seen.add(x);next.add(x)}})});if(seen.size>24)break}front=[...next].slice(0,6);if(!front.length||seen.size>24)break}const uniq=[...new Map(all.filter(t=>t.hash).map(t=>[t.hash,t])).values()];state.mode='live';state.source='Ethereum / Blockscout API';state.depth=depth;state.txs=uniq;buildGraph(uniq,state.root);populateCase()}
+async function loadWallet(addr,depth){
+    state.root=addr.toLowerCase();
+
+    const data=await api(`/api/v1/trace/${state.root}?depth=${depth}`);
+
+    const raw =
+        data.transactions ||
+        data.items ||
+        data.data ||
+        data.trace?.transactions ||
+        data.result?.transactions ||
+        data.result ||
+        [];
+
+    const txs=(Array.isArray(raw)?raw:[]).map(normalizeTx);
+
+    if(!txs.length){
+        throw new Error('Trace returned no transaction records');
+    }
+
+    state.mode='live';
+    state.source='ChainSight FastAPI → public Ethereum data';
+    state.depth=depth;
+
+    state.txs=[
+        ...new Map(
+            txs.filter(t=>t.hash).map(t=>[t.hash,t])
+        ).values()
+    ];
+
+    buildGraph(state.txs,state.root);
+    populateCase();
+}
 async function loadTransaction(hash,depth){const tx=normalizeTx(await api(`/transactions/${hash}`));if(!tx.from)throw new Error('Transaction was not found or has no sender');state.root=tx.from;let all=[tx];const seeds=[tx.from,tx.to].filter(Boolean);for(const a of seeds.slice(0,2)){all.push(...await fetchAddress(a))}const uniq=[...new Map(all.filter(t=>t.hash).map(t=>[t.hash,t])).values()];state.mode='live';state.source='Ethereum transaction / Blockscout API';state.depth=Math.min(depth,1);state.txs=uniq;buildGraph(uniq,state.root);populateCase()}
 function addDemoButton(){const panel=document.querySelector('#dashboard .top');if(panel&&!document.getElementById('demoBtn')){const b=document.createElement('button');b.id='demoBtn';b.className='btn';b.textContent='Load Demo Case';b.onclick=loadDemo;panel.appendChild(b)}const inv=document.querySelector('#investigate .controls');if(inv&&!document.getElementById('demoBtn2')){const b=document.createElement('button');b.id='demoBtn2';b.className='btn';b.textContent='Demo';b.onclick=loadDemo;inv.appendChild(b)}}
 async function runInvestigation(){const q=$('query').value.trim().toLowerCase();const d=Number($('depth').value);const st=$('traceStatus');st.style.display='block';if(/^0x[a-f0-9]{64}$/.test(q)){try{st.textContent='Looking up transaction hash…';await loadTransaction(q,d);st.style.display='none';showView('dashboard',document.querySelector('.nav button'));return}catch(e){st.textContent='Transaction lookup failed: '+e.message;return}}if(!/^0x[a-f0-9]{40}$/.test(q)){st.textContent='Enter a valid Ethereum wallet address (0x + 40 hex) or transaction hash (0x + 64 hex).';return}try{st.textContent='Querying Ethereum…';await loadWallet(q,d);st.style.display='none';showView('dashboard',document.querySelector('.nav button'))}catch(e){st.textContent='Live lookup failed: '+e.message+'. Try again or verify the address.'}}
