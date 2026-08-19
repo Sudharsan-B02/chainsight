@@ -1,4 +1,4 @@
-const API='https://eth.blockscout.com/api/v2';
+const API='https://chainsight-api-sz3r.onrender.com';
 let state={root:'',depth:3,txs:[],nodes:new Map(),alerts:[],risk:0,mode:'demo',source:'Synthetic demonstration case'};
 const $=id=>document.getElementById(id);
 function showView(id,btn){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));$(id).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active')}
