@@ -228,100 +228,125 @@ function buildPaths(tx,root){
     return '<div class="empty">No case subject available.</div>';
   }
 
-  // Build outgoing transaction index.
-  const outgoing=new Map();
+  const graph=new Map();
 
-  for(const t of tx){
-    if(!t?.from || !t?.to) continue;
+  function addEdge(from,to,t){
+    if(!from || !to) return;
 
-    if(!outgoing.has(t.from)){
-      outgoing.set(t.from,[]);
+    if(!graph.has(from)){
+      graph.set(from,[]);
     }
 
-    outgoing.get(t.from).push(t);
+    graph.get(from).push({
+      address:to,
+      tx:t,
+      direction:'outgoing'
+    });
   }
 
-  // Keep paths evidence-linked.
-  const paths=[];
+  function addReverseEdge(from,to,t){
+    if(!from || !to) return;
 
-  function walk(address,pathTx,visited,depth){
+    if(!graph.has(to)){
+      graph.set(to,[]);
+    }
+
+    graph.get(to).push({
+      address:from,
+      tx:t,
+      direction:'incoming'
+    });
+  }
+
+  for(const t of tx){
+
+    if(!t?.from || !t?.to){
+      continue;
+    }
+
+    addEdge(t.from,t.to,t);
+    addReverseEdge(t.from,t.to,t);
+  }
+
+  const rootKey=String(root).toLowerCase();
+
+  // Address lookup is case-insensitive.
+  const normalizedGraph=new Map();
+
+  for(const [address,edges] of graph){
+
+    const key=String(address).toLowerCase();
+
+    if(!normalizedGraph.has(key)){
+      normalizedGraph.set(key,[]);
+    }
+
+    normalizedGraph.get(key).push(...edges);
+  }
+
+  const paths=[];
+  const seenPaths=new Set();
+
+  function walk(address,path,visited,depth){
 
     if(depth>=3){
-      if(pathTx.length){
-        paths.push(pathTx);
+      if(path.length){
+        const key=path.map(x=>x.tx.hash||`${x.tx.from}-${x.tx.to}`).join('|');
+
+        if(!seenPaths.has(key)){
+          seenPaths.add(key);
+          paths.push(path);
+        }
       }
+
       return;
     }
 
-    const next=outgoing.get(address)||[];
+    const edges=normalizedGraph.get(
+      String(address).toLowerCase()
+    )||[];
 
-    for(const t of next.slice(0,8)){
+    for(const edge of edges.slice(0,12)){
 
-      if(visited.has(t.to)){
+      const next=String(edge.address).toLowerCase();
+
+      if(visited.has(next)){
         continue;
       }
 
-      const nextPath=[...pathTx,t];
+      const nextPath=[
+        ...path,
+        edge
+      ];
+
+      const nextVisited=new Set(visited);
+      nextVisited.add(next);
 
       paths.push(nextPath);
 
-      const nextVisited=new Set(visited);
-      nextVisited.add(t.to);
-
-      walk(t.to,nextPath,nextVisited,depth+1);
+      walk(
+        edge.address,
+        nextPath,
+        nextVisited,
+        depth+1
+      );
     }
   }
 
-  walk(root,[],new Set([root]),0);
+  walk(
+    root,
+    [],
+    new Set([rootKey]),
+    0
+  );
 
-  // Remove duplicate paths.
-  const unique=[];
-  const seen=new Set();
-
-  for(const path of paths){
-
-    const key=path.map(t=>t.hash||`${t.from}-${t.to}`).join('|');
-
-    if(!seen.has(key)){
-      seen.add(key);
-      unique.push(path);
-    }
-  }
-
-  const selected=unique.slice(0,8);
+  const selected=paths.slice(0,12);
 
   if(!selected.length){
 
-    const direct=tx.find(t=>t.from===root);
-
-    if(!direct){
-      return '<div class="empty">No direct transaction path from the case subject.</div>';
-    }
-
     return `
-      <div style="margin:10px 0">
-        <div class="sub">Direct transaction</div>
-
-        <div class="path">
-
-          <div class="node">
-            <b>ROOT</b>
-            <div class="mono">${short(root)}</div>
-          </div>
-
-          <div class="arrow">→</div>
-
-          <div class="node">
-            <b>Hop 1</b>
-            <div class="mono">${short(direct.to)}</div>
-          </div>
-
-        </div>
-
-        <div class="sub mono">
-          TX: ${esc(direct.hash||'Unknown hash')}
-        </div>
-
+      <div class="empty">
+        No relationship paths were found in the observed transaction graph.
       </div>
     `;
   }
@@ -330,7 +355,6 @@ function buildPaths(tx,root){
 
     const nodes=[];
 
-    // Root node.
     nodes.push(`
       <div class="node">
         <b>ROOT</b>
@@ -338,9 +362,15 @@ function buildPaths(tx,root){
       </div>
     `);
 
-    path.forEach((t,j)=>{
+    path.forEach((edge,j)=>{
 
+      const t=edge.tx;
       const hop=j+1;
+
+      const direction=
+        edge.direction==='incoming'
+          ? '← incoming'
+          : '→ outgoing';
 
       nodes.push(`
         <div class="arrow">→</div>
@@ -350,10 +380,14 @@ function buildPaths(tx,root){
           <b>Hop ${hop}</b>
 
           <div class="mono">
-            ${short(t.to)}
+            ${short(edge.address)}
           </div>
 
           <div class="sub" style="margin-top:6px">
+            ${direction}
+          </div>
+
+          <div class="sub">
             ${esc(txTime(t))}
           </div>
 
