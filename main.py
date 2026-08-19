@@ -64,10 +64,9 @@ async def blockscout(path: str) -> dict[str, Any]:
 
 async def address_transactions(address: str) -> list[dict[str, Any]]:
     data = await blockscout(
-        f"addresses/{address}/transactions?filter=validated&page_size=100"
+        f"addresses/{address}/transactions"
     )
     return [normalize_tx(x) for x in data.get("items", []) if x.get("hash")]
-
 
 def risk_for(address: str, txs: list[dict[str, Any]]) -> int:
     address = address.lower()
