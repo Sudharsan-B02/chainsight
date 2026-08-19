@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ChainSight · Stage 8E Analyst Workspace</title>
+<style>
+:root{--bg:#07121a;--panel:#0c1a24;--line:#203542;--text:#edf5f7;--muted:#8ca1ab;--teal:#55d6be;--amber:#ffbd59;--red:#ff647c}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#061018,#091a24);color:var(--text);font:14px/1.5 Arial,sans-serif}
+.wrap{max-width:1250px;margin:auto;padding:28px}.top{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:22px}
+.brand{color:var(--teal);font-weight:800;letter-spacing:.08em}.sub{color:var(--muted)}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap}.btn,input,textarea{background:#0b1821;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 12px}
+.btn{cursor:pointer}.btn:hover{border-color:var(--teal)}input{min-width:330px}
+.grid{display:grid;grid-template-columns:1.3fr .7fr;gap:16px}.panel{background:rgba(12,26,36,.92);border:1px solid var(--line);border-radius:12px;padding:18px}
+.panel h2,.panel h3{margin:0 0 12px}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.metric{padding:14px;background:#091720;border:1px solid var(--line);border-radius:10px}.metric b{display:block;font-size:24px}.metric span{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.timeline{position:relative;margin:10px 0 0 8px;padding-left:22px;border-left:1px solid #35505d}.event{position:relative;padding:10px 0 12px}
+.event:before{content:"";position:absolute;left:-28px;top:17px;width:10px;height:10px;border-radius:50%;background:var(--teal);box-shadow:0 0 0 3px var(--panel)}
+.event.high:before,.event.critical:before{background:var(--red)}.event.medium:before{background:var(--amber)}
+.event .time{color:var(--muted);font-size:12px}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all}
+.badge{display:inline-block;padding:3px 7px;border-radius:999px;font-size:11px;font-weight:700}
+.critical{background:#3a1420;color:#ff8093}.high{background:#321c10;color:#ffc46d}.medium{background:#2b2411;color:#ffd879}.low{background:#0c2b27;color:#6ce0c9}
+.path{display:flex;align-items:center;gap:8px;overflow:auto;padding:12px 0}.node{min-width:120px;padding:10px;border:1px solid var(--line);border-radius:8px;background:#091720}.arrow{color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:12px}th,td{border-bottom:1px solid var(--line);padding:9px;text-align:left}th{color:var(--muted);font-size:10px;text-transform:uppercase}
+.scroll{max-height:330px;overflow:auto}.note{width:100%;min-height:130px;margin-top:8px}.save{margin-top:8px}.empty{color:var(--muted);padding:18px;text-align:center}
+@media(max-width:900px){.grid{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}input{min-width:0;width:100%}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<div class="top">
+<div><div class="brand">CHAINSIGHT · STAGE 8E</div><h1>Analyst Investigation Workspace</h1>
+<div class="sub">Timeline · relationship paths · explainable risk · analyst notes · evidence-linked review</div></div>
+<div class="toolbar"><input id="case" placeholder="Case ID e.g. CS-2026-0001">
+<button class="btn" onclick="loadCase()">Load Case</button><button class="btn" onclick="loadLatest()">Latest Case</button></div>
+</div>
+
+<section class="panel"><div class="metrics">
+<div class="metric"><span>Case</span><b id="mCase">—</b></div>
+<div class="metric"><span>Risk</span><b id="mRisk">—</b></div>
+<div class="metric"><span>Transactions</span><b id="mTx">—</b></div>
+<div class="metric"><span>Evidence</span><b id="mEv">—</b></div>
+</div></section>
+
+<div class="grid" style="margin-top:16px">
+<section class="panel"><h2>Investigation Timeline</h2><div class="sub">Chronological transaction activity with risk context.</div>
+<div id="timeline" class="timeline"><div class="empty">Load a saved case.</div></div></section>
+<section class="panel"><h2>Risk Assessment</h2><div id="riskBox" class="empty">No case loaded.</div>
+<h3 style="margin-top:20px">Analyst Notes</h3>
+<textarea id="notes" class="note" placeholder="Record observations, hypotheses, decisions and follow-up actions..."></textarea>
+<button class="btn save" onclick="saveNotes()">Save Notes</button> <span id="noteStatus" class="sub"></span>
+</section></div>
+
+<div class="grid" style="margin-top:16px">
+<section class="panel"><h2>Relationship Path Analysis</h2><div class="sub">Direct transaction paths through the observed case graph.</div>
+<div id="paths"><div class="empty">Load a case.</div></div></section>
+<section class="panel"><h2>Risk Factor Breakdown</h2><div id="factors"><div class="empty">Load a case.</div></div></section>
+</div>
+
+<section class="panel" style="margin-top:16px"><h2>Evidence Ledger</h2>
+<div class="sub">Each record retains its source and retrieval provenance.</div>
+<div class="scroll"><table><thead><tr><th>ID</th><th>Type</th><th>Reference</th><th>Source</th><th>Retrieved</th></tr></thead>
+<tbody id="evidence"></tbody></table></div></section>
+
+<section class="panel" style="margin-top:16px"><h2>Transaction Evidence</h2>
+<div class="scroll"><table><thead><tr><th>Time</th><th>Hash</th><th>From</th><th>To</th><th>ETH</th></tr></thead>
+<tbody id="txs"></tbody></table></div></section>
+<div id="status" class="sub" style="margin-top:14px"></div>
+</main>
+
+<script>
+const API='https://chainsight-api-sz3r.onrender.com';
+let current=null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const short=s=>s?s.slice(0,10)+'…'+s.slice(-8):'—';
+const eth=v=>(Number(v||0)/1e18).toFixed(5);
+
+async function api(path,opts={}){
+ const r=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts});
+ let d={};try{d=await r.json()}catch{}
+ if(!r.ok)throw Error(d.detail||`API ${r.status}`);return d;
+}
+async function loadLatest(){
+ try{const d=await api('/api/v1/cases');if(!d.items?.length)throw Error('No saved cases found');
+ $('case').value=d.items[0].case_id;await loadCase()}catch(e){$('status').textContent=e.message}
+}
+async function loadCase(){
+ const id=$('case').value.trim();if(!id)return;
+ $('status').textContent='Loading case…';
+ try{current=await api('/api/v1/cases/'+encodeURIComponent(id));render();
+ $('status').textContent=`Loaded ${current.case_id}`;
+ $('notes').value=localStorage.getItem('chainsight_stage8e_notes_'+current.case_id)||'';
+ }catch(e){$('status').textContent='Load failed: '+e.message}
+}
+function level(r){return r>=70?'CRITICAL':r>=50?'HIGH':r>=30?'MEDIUM':'LOW'}
+function render(){
+ const c=current,tx=c.transactions||[],ev=c.evidence||[],alerts=c.alerts||[];
+ $('mCase').textContent=c.case_id;$('mRisk').textContent=c.risk+'/100';$('mTx').textContent=tx.length;$('mEv').textContent=ev.length;
+ $('riskBox').innerHTML=`<div class="badge ${level(c.risk).toLowerCase()}">${level(c.risk)}</div>
+ <div style="font-size:42px;font-weight:800;margin:5px 0">${c.risk}<small>/100</small></div>
+ <div class="sub">Case-level risk score from the Stage 8D backend heuristic engine.</div>
+ <hr style="border-color:#203542;margin:16px 0"><b>${alerts.length}</b> persisted risk indicators`;
+
+ $('timeline').innerHTML=tx.slice().sort((a,b)=>String(a.timestamp||'').localeCompare(String(b.timestamp||''))).map(t=>{
+ const a=alerts.find(x=>x.address===t.from||x.address===t.to);const l=a?level(a.score||0):'LOW';
+ return `<div class="event ${l.toLowerCase()}"><div class="time">${esc(t.timestamp||'Unknown time')} · <span class="badge ${l.toLowerCase()}">${l}</span></div>
+ <div><b>${short(t.from)}</b> → <b>${short(t.to)}</b> · ${eth(t.value)} ETH</div><div class="mono sub">${esc(t.hash)}</div></div>`
+ }).join('')||'<div class="empty">No transactions.</div>';
+
+ $('paths').innerHTML=buildPaths(tx,c.subject);
+ $('factors').innerHTML=alerts.length?alerts.map(a=>`<div style="padding:12px 0;border-bottom:1px solid #203542">
+ <span class="badge ${String(a.level).toLowerCase()}">${esc(a.level)}</span> <b>${esc(a.title)}</b>
+ <div class="mono sub">${esc(a.address||'')}</div><div>${esc(a.reason)}</div></div>`).join(''):'<div class="empty">No elevated indicators.</div>';
+
+ $('evidence').innerHTML=ev.map(e=>`<tr><td><b>${esc(e.evidence_id)}</b></td><td>${esc(e.evidence_type)}</td>
+ <td class="mono">${esc(e.reference)}</td><td>${esc(e.source)}</td><td>${esc(e.retrieved_at)}</td></tr>`).join('')||'<tr><td colspan="5">No evidence.</td></tr>';
+
+ $('txs').innerHTML=tx.map(t=>`<tr><td>${esc(t.timestamp||'—')}</td><td class="mono">${esc(short(t.hash))}</td>
+ <td class="mono">${esc(short(t.from))}</td><td class="mono">${esc(short(t.to))}</td><td>${eth(t.value)}</td></tr>`).join('')||'<tr><td colspan="5">No transactions.</td></tr>';
+}
+function buildPaths(tx,root){
+ const adj=new Map();
+ for(const t of tx){if(!adj.has(t.from))adj.set(t.from,[]);adj.get(t.from).push(t.to)}
+ const paths=[];
+ for(const first of (adj.get(root)||[]).slice(0,8)){
+  const second=(adj.get(first)||[])[0];
+  paths.push([root,first,...(second&&second!==root?[second]:[])]);
+ }
+ if(!paths.length){
+  const peer=tx.find(t=>t.from===root)?.to;
+  return peer?`<div class="path"><div class="node"><b>ROOT</b><div class="mono">${short(root)}</div></div>
+  <div class="arrow">→</div><div class="node"><b>Counterparty</b><div class="mono">${short(peer)}</div></div></div>`:
+  '<div class="empty">No direct paths from the case subject.</div>';
+ }
+ return paths.map((p,i)=>`<div style="margin:10px 0"><div class="sub">Path ${i+1}</div><div class="path">
+ ${p.map((x,j)=>`${j?'<div class="arrow">→</div>':''}<div class="node"><b>${j===0?'ROOT':'Hop '+j}</b><div class="mono">${short(x)}</div></div>`).join('')}</div></div>`).join('');
+}
+function saveNotes(){
+ if(!current)return;
+ localStorage.setItem('chainsight_stage8e_notes_'+current.case_id,$('notes').value);
+ $('noteStatus').textContent='Saved locally for this case.';
+}
+</script>
+</body>
+</html>
