@@ -76,19 +76,79 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&
 const short=s=>s?s.slice(0,10)+'…'+s.slice(-8):'—';
 const eth=v=>(Number(v||0)/1e18).toFixed(5);
 
-// Stage 8E.1: tolerate timestamp names/formats returned by the backend.
-function txTime(t){
-  const raw=t?.timestamp??t?.time??t?.block_timestamp??t?.blockTimestamp??
-            t?.datetime??t?.date??t?.created_at??t?.createdAt??null;
-  if(raw===null||raw===undefined||raw==='') return 'Unknown time';
-  const n=Number(raw);
-  if(Number.isFinite(n)&&n>1000000000){
-    const ms=n<100000000000?n*1000:n;
-    return new Date(ms).toISOString().replace('T',' ').replace('.000Z',' UTC');
+// Stage 8E.1: robust timestamp normalization
+function timestampRaw(t){
+  const candidates=[
+    t?.timestamp,
+    t?.time,
+    t?.block_timestamp,
+    t?.blockTimestamp,
+    t?.datetime,
+    t?.date,
+    t?.created_at,
+    t?.createdAt,
+    t?.block?.timestamp,
+    t?.block?.time,
+    t?.metadata?.timestamp,
+    t?.metadata?.block_timestamp,
+    t?.metadata?.blockTimestamp
+  ];
+
+  for(const raw of candidates){
+    if(raw!==null && raw!==undefined && raw!==''){
+      return raw;
+    }
   }
-  const d=new Date(raw);
-  return Number.isNaN(d.getTime())?String(raw):
-    d.toISOString().replace('T',' ').replace('.000Z',' UTC');
+
+  return null;
+}
+
+function timestampMs(t){
+  let raw=timestampRaw(t);
+
+  if(raw===null) return NaN;
+
+  if(typeof raw==='object'){
+    raw=raw.value ?? raw.timestamp ?? raw.time ?? raw.date ?? null;
+  }
+
+  if(raw===null || raw===undefined || raw===''){
+    return NaN;
+  }
+
+  const text=String(raw).trim();
+  const n=Number(text);
+
+  // Unix timestamp formats
+  if(Number.isFinite(n)){
+    if(n>1e17) return n/1e6;   // nanoseconds
+    if(n>1e14) return n/1e3;   // microseconds
+    if(n>1e11) return n;       // milliseconds
+    if(n>1e9) return n*1000;   // seconds
+  }
+
+  // Normalize timestamps containing >3 fractional-second digits
+  const normalized=text.replace(
+    /(\.\d{3})\d+(Z|[+-]\d\d:?\d\d)?$/,
+    '$1$2'
+  );
+
+  const parsed=Date.parse(normalized);
+
+  return Number.isNaN(parsed) ? NaN : parsed;
+}
+
+function txTime(t){
+  const ms=timestampMs(t);
+
+  if(!Number.isFinite(ms)){
+    return 'Unknown time';
+  }
+
+  return new Date(ms)
+    .toISOString()
+    .replace('T',' ')
+    .replace('.000Z',' UTC');
 }
 
 function evidenceType(e){
@@ -129,7 +189,16 @@ function render(){
  <div class="sub">Case-level risk score from the Stage 8D backend heuristic engine.</div>
  <hr style="border-color:#203542;margin:16px 0"><b>${alerts.length}</b> persisted risk indicators`;
 
- $('timeline').innerHTML=tx.slice().sort((a,b)=>String(a.timestamp||'').localeCompare(String(b.timestamp||''))).map(t=>{
+ $('timeline').innerHTML=tx.slice().sort((a,b)=>{
+  const am=timestampMs(a);
+  const bm=timestampMs(b);
+
+  if(Number.isFinite(am) && Number.isFinite(bm)) return am-bm;
+  if(Number.isFinite(am)) return -1;
+  if(Number.isFinite(bm)) return 1;
+
+  return 0;
+}).map(t=>{
  const a=alerts.find(x=>x.address===t.from||x.address===t.to);const l=a?level(a.score||0):'LOW';
  return `<div class="event ${l.toLowerCase()}"><div class="time">${esc(txTime(t))} · <span class="badge ${l.toLowerCase()}">${l}</span></div>
  <div><b>${short(t.from)}</b> → <b>${short(t.to)}</b> · ${eth(t.value)} ETH</div><div class="mono sub">${esc(t.hash)}</div></div>`
