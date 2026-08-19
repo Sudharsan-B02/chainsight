@@ -251,3 +251,149 @@ a.remove();
 URL.revokeObjectURL(url);
 }
 addDemoButton();
+function updateReport8B(){
+    if(!state || !state.txs || !state.txs.length) return;
+
+    const report=document.getElementById('reportContent');
+    if(!report) return;
+
+    if(document.getElementById('report8b')){
+        updateReport8BData();
+        return;
+    }
+
+    report.insertAdjacentHTML('beforeend',`
+        <div id="report8b">
+
+            <h2 style="margin-top:18px">Investigation Metrics</h2>
+
+            <div class="case">
+                <div class="card">
+                    <div class="label">Transactions observed</div>
+                    <div id="reportTxCount" class="value">—</div>
+                </div>
+
+                <div class="card">
+                    <div class="label">Wallets observed</div>
+                    <div id="reportNodeCount" class="value">—</div>
+                </div>
+
+                <div class="card">
+                    <div class="label">Risk indicators</div>
+                    <div id="reportAlertCount" class="value red">—</div>
+                </div>
+
+                <div class="card">
+                    <div class="label">Value observed</div>
+                    <div id="reportValue" class="value">—</div>
+                </div>
+            </div>
+
+            <h2>Risk Indicators</h2>
+            <div id="reportAlerts"></div>
+
+            <h2>Transaction Evidence</h2>
+            <div class="tableWrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Transaction</th>
+                            <th>From</th>
+                            <th>To</th>
+                            <th>Amount</th>
+                            <th>Risk</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportEvidence"></tbody>
+                </table>
+            </div>
+
+            <h2>Investigation Provenance</h2>
+            <div class="card">
+                <div class="label">Source</div>
+                <div id="reportSource" style="margin-top:6px">
+                    —
+                </div>
+            </div>
+
+        </div>
+    `);
+
+    updateReport8BData();
+}
+
+
+function updateReport8BData(){
+
+    if(!state || !state.txs || !state.txs.length) return;
+
+    const txCount=document.getElementById('reportTxCount');
+    const nodeCount=document.getElementById('reportNodeCount');
+    const alertCount=document.getElementById('reportAlertCount');
+    const value=document.getElementById('reportValue');
+
+    if(txCount) txCount.textContent=state.txs.length;
+    if(nodeCount) nodeCount.textContent=state.nodes.size;
+    if(alertCount) alertCount.textContent=state.alerts.length;
+
+    if(value){
+        value.textContent=
+            (state.txs.reduce((s,t)=>s+t.value,0)/1e18)
+            .toFixed(2)+' ETH';
+    }
+
+    const alerts=document.getElementById('reportAlerts');
+
+    if(alerts){
+        alerts.innerHTML=state.alerts.length
+        ? state.alerts.map(a=>`
+            <div class="alert">
+                <b>${esc(a.level)} · ${esc(a.title)}</b>
+                <span class="mono">${esc(a.addr)}</span>
+                <br>
+                ${esc(a.reason)}
+            </div>
+        `).join('')
+        : '<div class="hint">No elevated risk indicators detected.</div>';
+    }
+
+    const evidence=document.getElementById('reportEvidence');
+
+    if(evidence){
+        evidence.innerHTML=state.txs.slice(0,100).map(t=>{
+
+            const r=scoreNode(t.from,state.txs);
+            const level=
+                r>=70?'HIGH':
+                r>=30?'MEDIUM':
+                'LOW';
+
+            return `
+                <tr>
+                    <td>${esc(t.time||'—')}</td>
+                    <td class="mono">${esc(short(t.hash))}</td>
+                    <td class="mono">${esc(short(t.from))}</td>
+                    <td class="mono">${esc(short(t.to))}</td>
+                    <td>${eth(t.value)} ETH</td>
+                    <td>
+                        <span class="status ${level.toLowerCase()}">
+                            ${level}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    const source=document.getElementById('reportSource');
+
+    if(source){
+        source.textContent=
+            state.source ||
+            'Ethereum / Blockscout';
+    }
+}
+
+
+setInterval(updateReport8B,1000);
