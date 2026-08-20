@@ -205,10 +205,48 @@ function render(){
  }).join('')||'<div class="empty">No transactions.</div>';
 
  $('paths').innerHTML=buildPaths(tx,c.subject);
- $('factors').innerHTML=alerts.length?alerts.map(a=>`<div style="padding:12px 0;border-bottom:1px solid #203542">
- <span class="badge ${String(a.level).toLowerCase()}">${esc(a.level)}</span> <b>${esc(a.title)}</b>
- <div class="mono sub">${esc(a.address||'')}</div><div>${esc(a.reason)}</div></div>`).join(''):'<div class="empty">No elevated indicators.</div>';
+const factorGroups=new Map();
 
+for(const a of alerts){
+
+  const address=String(a.address||'').toLowerCase();
+  const title=String(a.title||'').toLowerCase();
+
+  const key=`${address}|${title}`;
+
+  if(!factorGroups.has(key)){
+    factorGroups.set(key,{
+      level:a.level,
+      title:a.title,
+      address:a.address||'',
+      reason:a.reason||'',
+      count:0
+    });
+  }
+
+  factorGroups.get(key).count++;
+}
+
+$('factors').innerHTML=factorGroups.size
+  ? Array.from(factorGroups.values()).map(a=>`
+    <div style="padding:12px 0;border-bottom:1px solid #203542">
+      <span class="badge ${String(a.level).toLowerCase()}">
+        ${esc(a.level)}
+      </span>
+      <b>${esc(a.title)}</b>
+
+      <div class="mono sub">${esc(a.address||'')}</div>
+
+      <div>${esc(a.reason)}</div>
+
+      ${a.count>1
+        ? `<div class="sub" style="margin-top:5px">
+             ${a.count} related indicators
+           </div>`
+        : ''}
+    </div>
+  `).join('')
+  : '<div class="empty">No elevated indicators.</div>';
  $('evidence').innerHTML=ev.map((e,i)=>{
  const typ=evidenceType(e);
  const ref=e.reference??e.hash??e.tx_hash??e.transaction_hash??e.address??'—';
