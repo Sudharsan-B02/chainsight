@@ -228,35 +228,23 @@ function buildPaths(tx,root){
     return '<div class="empty">No case subject available.</div>';
   }
 
-  const graph=new Map();
+  const rootKey=String(root).toLowerCase();
 
-  function addEdge(from,to,t){
-    if(!from || !to) return;
+  /*
+   * Stage 8E.2:
+   * Relationship deduplication.
+   *
+   * Multiple blockchain transactions can represent the same
+   * wallet-to-wallet relationship. We therefore group records
+   * by:
+   *
+   *   source wallet + destination wallet
+   *
+   * while keeping transaction count and a representative
+   * transaction for evidence display.
+   */
 
-    if(!graph.has(from)){
-      graph.set(from,[]);
-    }
-
-    graph.get(from).push({
-      address:to,
-      tx:t,
-      direction:'outgoing'
-    });
-  }
-
-  function addReverseEdge(from,to,t){
-    if(!from || !to) return;
-
-    if(!graph.has(to)){
-      graph.set(to,[]);
-    }
-
-    graph.get(to).push({
-      address:from,
-      tx:t,
-      direction:'incoming'
-    });
-  }
+  const relationships=new Map();
 
   for(const t of tx){
 
@@ -264,160 +252,174 @@ function buildPaths(tx,root){
       continue;
     }
 
-    addEdge(t.from,t.to,t);
-    addReverseEdge(t.from,t.to,t);
-  }
+    const from=String(t.from).toLowerCase();
+    const to=String(t.to).toLowerCase();
 
-  const rootKey=String(root).toLowerCase();
-
-  // Address lookup is case-insensitive.
-  const normalizedGraph=new Map();
-
-  for(const [address,edges] of graph){
-
-    const key=String(address).toLowerCase();
-
-    if(!normalizedGraph.has(key)){
-      normalizedGraph.set(key,[]);
+    if(!from || !to){
+      continue;
     }
 
-    normalizedGraph.get(key).push(...edges);
-  }
+    /*
+     * Direction is intentionally preserved.
+     *
+     * A → B and B → A are different relationships.
+     */
+    const key=`${from}|${to}`;
 
-  const paths=[];
-  const seenPaths=new Set();
-
-  function walk(address,path,visited,depth){
-
-    if(depth>=3){
-      if(path.length){
-        const key=path.map(x=>x.tx.hash||`${x.tx.from}-${x.tx.to}`).join('|');
-
-        if(!seenPaths.has(key)){
-          seenPaths.add(key);
-          paths.push(path);
-        }
-      }
-
-      return;
+    if(!relationships.has(key)){
+      relationships.set(key,{
+        from:t.from,
+        to:t.to,
+        transactions:[],
+        representative:t
+      });
     }
 
-    const edges=normalizedGraph.get(
-      String(address).toLowerCase()
-    )||[];
+    const relationship=relationships.get(key);
 
-    for(const edge of edges.slice(0,12)){
+    relationship.transactions.push(t);
 
-      const next=String(edge.address).toLowerCase();
+    /*
+     * Keep the most recent valid transaction as the
+     * representative evidence record.
+     */
+    const currentMs=timestampMs(relationship.representative);
+    const nextMs=timestampMs(t);
 
-      if(visited.has(next)){
-        continue;
-      }
-
-      const nextPath=[
-        ...path,
-        edge
-      ];
-
-      const nextVisited=new Set(visited);
-      nextVisited.add(next);
-
-      paths.push(nextPath);
-
-      walk(
-        edge.address,
-        nextPath,
-        nextVisited,
-        depth+1
-      );
+    if(
+      Number.isFinite(nextMs) &&
+      (!Number.isFinite(currentMs) || nextMs>currentMs)
+    ){
+      relationship.representative=t;
     }
   }
 
-  walk(
-    root,
-    [],
-    new Set([rootKey]),
-    0
-  );
+  /*
+   * Build only relationships directly connected to the
+   * investigated root.
+   */
+  const direct=[];
 
-  const selected=paths.slice(0,12);
+  for(const relationship of relationships.values()){
 
-  if(!selected.length){
+    const from=String(relationship.from).toLowerCase();
+    const to=String(relationship.to).toLowerCase();
+
+    if(from===rootKey || to===rootKey){
+
+      const isOutgoing=from===rootKey;
+
+      direct.push({
+        ...relationship,
+        direction:isOutgoing?'outgoing':'incoming',
+        counterparty:isOutgoing
+          ? relationship.to
+          : relationship.from
+      });
+    }
+  }
+
+  if(!direct.length){
+    return '<div class="empty">No direct transaction path from the case subject.</div>';
+  }
+
+  /*
+   * Stable ordering:
+   * newest relationship first.
+   */
+  direct.sort((a,b)=>{
+
+    const am=timestampMs(a.representative);
+    const bm=timestampMs(b.representative);
+
+    if(Number.isFinite(am) && Number.isFinite(bm)){
+      return bm-am;
+    }
+
+    if(Number.isFinite(am)){
+      return -1;
+    }
+
+    if(Number.isFinite(bm)){
+      return 1;
+    }
+
+    return 0;
+  });
+
+  return direct.map((relationship,index)=>{
+
+    const t=relationship.representative;
+
+    const directionText=
+      relationship.direction==='outgoing'
+        ? 'outgoing'
+        : 'incoming';
+
+    const arrow=
+      relationship.direction==='outgoing'
+        ? '→'
+        : '←';
+
+    const transactionCount=relationship.transactions.length;
+
+    const relationshipLabel=
+      transactionCount===1
+        ? '1 related transaction'
+        : `${transactionCount} related transactions`;
 
     return `
-      <div class="empty">
-        No relationship paths were found in the observed transaction graph.
-      </div>
-    `;
-  }
+      <div style="margin-bottom:18px">
 
-  return selected.map((path,index)=>{
-
-    const nodes=[];
-
-    nodes.push(`
-      <div class="node">
-        <b>ROOT</b>
-        <div class="mono">${short(root)}</div>
-      </div>
-    `);
-
-    path.forEach((edge,j)=>{
-
-      const t=edge.tx;
-      const hop=j+1;
-
-      const direction=
-        edge.direction==='incoming'
-          ? '← incoming'
-          : '→ outgoing';
-
-      nodes.push(`
-        <div class="arrow">→</div>
-
-        <div class="node">
-
-          <b>Hop ${hop}</b>
-
-          <div class="mono">
-            ${short(edge.address)}
-          </div>
-
-          <div class="sub" style="margin-top:6px">
-            ${direction}
-          </div>
-
-          <div class="sub">
-            ${esc(txTime(t))}
-          </div>
-
-          <div class="sub">
-            ${eth(t.value)} ETH
-          </div>
-
-          <div class="mono sub" style="margin-top:5px">
-            TX: ${esc(t.hash||'Unknown')}
-          </div>
-
-        </div>
-      `);
-
-    });
-
-    return `
-      <div style="margin:14px 0">
-
-        <div class="sub">
-          Path ${index+1} · ${path.length} hop${path.length===1?'':'s'}
+        <div class="sub" style="margin-bottom:8px">
+          Path ${index+1} · 1 hop
         </div>
 
         <div class="path">
-          ${nodes.join('')}
+
+          <div class="node">
+            <b>ROOT</b>
+            <div class="mono">${esc(short(root))}</div>
+          </div>
+
+          <div class="arrow">${arrow}</div>
+
+          <div class="node" style="min-width:260px">
+
+            <div>
+              <b>Hop 1</b>
+            </div>
+
+            <div class="mono">
+              ${esc(short(relationship.counterparty))}
+            </div>
+
+            <div class="sub" style="margin-top:5px">
+              ${directionText}
+            </div>
+
+            <div class="sub">
+              ${esc(txTime(t))}
+            </div>
+
+            <div style="margin-top:4px">
+              ${eth(t.value)} ETH
+            </div>
+
+            <div class="mono sub" style="margin-top:4px">
+              TX: ${esc(t.hash||'—')}
+            </div>
+
+            <div style="margin-top:8px;color:var(--teal)">
+              ${relationshipLabel}
+            </div>
+
+          </div>
+
         </div>
 
       </div>
     `;
-
   }).join('');
 }
 function saveNotes(){
