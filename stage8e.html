@@ -204,7 +204,7 @@ function render(){
  <div><b>${short(t.from)}</b> → <b>${short(t.to)}</b> · ${eth(t.value)} ETH</div><div class="mono sub">${esc(t.hash)}</div></div>`
  }).join('')||'<div class="empty">No transactions.</div>';
 
- $('paths').innerHTML=buildPaths(tx,c.subject);
+ $('paths').innerHTML=buildPaths(tx,c.subject,c.depth,ev);
 const factorGroups=new Map();
 
 for(const a of alerts){
@@ -260,202 +260,277 @@ $('factors').innerHTML=factorGroups.size
  $('txs').innerHTML=tx.map(t=>`<tr><td>${esc(txTime(t))}</td><td class="mono">${esc(short(t.hash))}</td>
  <td class="mono">${esc(short(t.from))}</td><td class="mono">${esc(short(t.to))}</td><td>${eth(t.value)}</td></tr>`).join('')||'<tr><td colspan="5">No transactions.</td></tr>';
 }
-function buildPaths(tx,root){
 
-  if(!root){
-    return '<div class="empty">No case subject available.</div>';
+function findMultiHopPaths(txList, rootAddress, maxDepth, evidenceList){
+  if(!rootAddress || !Array.isArray(txList) || !txList.length) return [];
+  const rootKey=String(rootAddress).toLowerCase();
+
+  // 1. Build evidence map
+  const evidenceMap=new Map();
+  if(Array.isArray(evidenceList)){
+    for(const e of evidenceList){
+      const ref=String(e.reference||e.hash||e.tx_hash||e.transaction_hash||'').toLowerCase();
+      if(ref && (e.evidence_id||e.id)){
+        evidenceMap.set(ref, e.evidence_id||e.id);
+      }
+    }
   }
 
-  const rootKey=String(root).toLowerCase();
+  // 2. Build deduplicated directed edges between wallets
+  const edgeMap=new Map();
+  const adjMap=new Map();
 
-  /*
-   * Stage 8E.2:
-   * Relationship deduplication.
-   *
-   * Multiple blockchain transactions can represent the same
-   * wallet-to-wallet relationship. We therefore group records
-   * by:
-   *
-   *   source wallet + destination wallet
-   *
-   * while keeping transaction count and a representative
-   * transaction for evidence display.
-   */
-
-  const relationships=new Map();
-
-  for(const t of tx){
-
-    if(!t?.from || !t?.to){
-      continue;
+  function getAdj(wKey){
+    if(!adjMap.has(wKey)){
+      adjMap.set(wKey, { outgoing:[], incoming:[] });
     }
+    return adjMap.get(wKey);
+  }
 
+  for(const t of txList){
+    if(!t?.from || !t?.to) continue;
     const from=String(t.from).toLowerCase();
     const to=String(t.to).toLowerCase();
+    if(!from || !to || from===to) continue;
 
-    if(!from || !to){
-      continue;
+    const edgeKey=`${from}|${to}`;
+    if(!edgeMap.has(edgeKey)){
+      const edgeObj={
+        from: t.from,
+        to: t.to,
+        fromKey: from,
+        toKey: to,
+        transactions: [],
+        representative: t,
+        totalValue: 0
+      };
+      edgeMap.set(edgeKey, edgeObj);
+      getAdj(from).outgoing.push(edgeObj);
+      getAdj(to).incoming.push(edgeObj);
     }
 
-    /*
-     * Direction is intentionally preserved.
-     *
-     * A → B and B → A are different relationships.
-     */
-    const key=`${from}|${to}`;
+    const edge=edgeMap.get(edgeKey);
+    edge.transactions.push(t);
+    edge.totalValue += Number(t.value || 0);
 
-    if(!relationships.has(key)){
-      relationships.set(key,{
-        from:t.from,
-        to:t.to,
-        transactions:[],
-        representative:t
-      });
-    }
-
-    const relationship=relationships.get(key);
-
-    relationship.transactions.push(t);
-
-    /*
-     * Keep the most recent valid transaction as the
-     * representative evidence record.
-     */
-    const currentMs=timestampMs(relationship.representative);
-    const nextMs=timestampMs(t);
-
-    if(
-      Number.isFinite(nextMs) &&
-      (!Number.isFinite(currentMs) || nextMs>currentMs)
-    ){
-      relationship.representative=t;
+    const curMs=timestampMs(edge.representative);
+    const newMs=timestampMs(t);
+    if(Number.isFinite(newMs) && (!Number.isFinite(curMs) || newMs > curMs)){
+      edge.representative=t;
     }
   }
 
-  /*
-   * Build only relationships directly connected to the
-   * investigated root.
-   */
-  const direct=[];
+  const limitDepth=Math.min(Math.max(Number(maxDepth)||3, 1), 3);
+  const rawPaths=[];
 
-  for(const relationship of relationships.values()){
+  // 3. DFS to explore paths from root
+  function dfs(currentKey, currentHops, visitedKeys){
+    if(currentHops.length>=limitDepth){
+      rawPaths.push([...currentHops]);
+      return;
+    }
 
-    const from=String(relationship.from).toLowerCase();
-    const to=String(relationship.to).toLowerCase();
+    const adj=adjMap.get(currentKey);
+    let extended=false;
 
-    if(from===rootKey || to===rootKey){
+    if(adj){
+      // Outgoing edges from currentKey -> nextKey
+      for(const edge of adj.outgoing){
+        const nextKey=edge.toKey;
+        if(visitedKeys.has(nextKey)) continue;
 
-      const isOutgoing=from===rootKey;
+        visitedKeys.add(nextKey);
+        const refHash=String(edge.representative?.hash||'').toLowerCase();
+        const hopInfo={
+          wallet: edge.to,
+          walletKey: nextKey,
+          direction: 'outgoing',
+          arrow: '→',
+          directionText: 'outgoing (sent)',
+          representative: edge.representative,
+          transactions: edge.transactions,
+          totalValue: edge.totalValue,
+          evidenceId: evidenceMap.get(refHash)||null
+        };
 
-      direct.push({
-        ...relationship,
-        direction:isOutgoing?'outgoing':'incoming',
-        counterparty:isOutgoing
-          ? relationship.to
-          : relationship.from
-      });
+        currentHops.push(hopInfo);
+        extended=true;
+        dfs(nextKey, currentHops, visitedKeys);
+        currentHops.pop();
+        visitedKeys.delete(nextKey);
+      }
+
+      // Incoming edges: nextKey -> currentKey (only explore for root or when tracing incoming chains)
+      const isFirstHop = currentHops.length === 0;
+      const isIncomingChain = currentHops.length > 0 && currentHops[0].direction === 'incoming';
+
+      if(isFirstHop || isIncomingChain){
+        for(const edge of adj.incoming){
+          const nextKey=edge.fromKey;
+          if(visitedKeys.has(nextKey)) continue;
+
+          visitedKeys.add(nextKey);
+          const refHash=String(edge.representative?.hash||'').toLowerCase();
+          const hopInfo={
+            wallet: edge.from,
+            walletKey: nextKey,
+            direction: 'incoming',
+            arrow: '←',
+            directionText: 'incoming (received)',
+            representative: edge.representative,
+            transactions: edge.transactions,
+            totalValue: edge.totalValue,
+            evidenceId: evidenceMap.get(refHash)||null
+          };
+
+          currentHops.push(hopInfo);
+          extended=true;
+          dfs(nextKey, currentHops, visitedKeys);
+          currentHops.pop();
+          visitedKeys.delete(nextKey);
+        }
+      }
+    }
+
+    if(!extended && currentHops.length>0){
+      rawPaths.push([...currentHops]);
     }
   }
 
-  if(!direct.length){
-    return '<div class="empty">No direct transaction path from the case subject.</div>';
+  const initialVisited=new Set([rootKey]);
+  dfs(rootKey, [], initialVisited);
+
+  // 4. Deduplicate paths by unique hop fingerprint
+  const uniquePaths=[];
+  const pathFingerprints=new Set();
+
+  for(const path of rawPaths){
+    const fp=path.map(h=>`${h.direction}:${h.walletKey}:${h.representative?.hash||''}`).join('>');
+    if(!pathFingerprints.has(fp)){
+      pathFingerprints.add(fp);
+      uniquePaths.push(path);
+    }
   }
 
-  /*
-   * Stable ordering:
-   * newest relationship first.
-   */
-  direct.sort((a,b)=>{
+  // 5. Filter out strict prefixes of longer paths to avoid redundant 1-hop duplicates
+  const maximalPaths=[];
+  for(let i=0; i<uniquePaths.length; i++){
+    const p1=uniquePaths[i];
+    let isPrefix=false;
+    for(let j=0; j<uniquePaths.length; j++){
+      if(i===j) continue;
+      const p2=uniquePaths[j];
+      if(p2.length>p1.length){
+        let match=true;
+        for(let k=0; k<p1.length; k++){
+          if(p1[k].walletKey!==p2[k].walletKey || p1[k].direction!==p2[k].direction){
+            match=false;
+            break;
+          }
+        }
+        if(match){
+          isPrefix=true;
+          break;
+        }
+      }
+    }
+    if(!isPrefix){
+      maximalPaths.push(p1);
+    }
+  }
 
-    const am=timestampMs(a.representative);
-    const bm=timestampMs(b.representative);
+  // 6. Sort paths: newest representative activity first, then deeper paths first
+  maximalPaths.sort((a,b)=>{
+    const aLast=a[a.length-1]?.representative;
+    const bLast=b[b.length-1]?.representative;
+    const am=timestampMs(aLast);
+    const bm=timestampMs(bLast);
 
     if(Number.isFinite(am) && Number.isFinite(bm)){
       return bm-am;
     }
-
-    if(Number.isFinite(am)){
-      return -1;
-    }
-
-    if(Number.isFinite(bm)){
-      return 1;
-    }
-
-    return 0;
+    if(Number.isFinite(am)) return -1;
+    if(Number.isFinite(bm)) return 1;
+    return b.length - a.length;
   });
 
-  return direct.map((relationship,index)=>{
+  return maximalPaths;
+}
 
-    const t=relationship.representative;
+function buildPaths(tx, root, depth, evidence){
+  if(!root){
+    return '<div class="empty">No case subject available.</div>';
+  }
 
-    const directionText=
-      relationship.direction==='outgoing'
-        ? 'outgoing'
-        : 'incoming';
+  const paths=findMultiHopPaths(tx, root, depth, evidence);
 
-    const arrow=
-      relationship.direction==='outgoing'
-        ? '→'
-        : '←';
+  if(!paths.length){
+    return '<div class="empty">No transaction paths observed for the case subject.</div>';
+  }
 
-    const transactionCount=relationship.transactions.length;
+  return paths.map((path, pathIndex)=>{
+    const hopCount=path.length;
+    const pathLabel=hopCount===1 ? '1 hop' : `${hopCount} hops`;
+    const firstHop=path[0];
+    const overallDirection=firstHop.direction==='outgoing' ? 'Outflow Trail' : 'Inflow Trail';
 
-    const relationshipLabel=
-      transactionCount===1
-        ? '1 related transaction'
-        : `${transactionCount} related transactions`;
+    const hopsHtml=path.map((hop, hopIdx)=>{
+      const t=hop.representative;
+      const txCount=hop.transactions.length;
+      const relLabel=txCount===1 ? '1 related transaction' : `${txCount} related transactions`;
+      const evId=hop.evidenceId;
+
+      return `
+        <div class="arrow">${hop.arrow}</div>
+
+        <div class="node" style="min-width:240px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <b>Hop ${hopIdx+1}</b>
+            ${evId ? `<span class="badge low" style="font-size:10px">${esc(evId)}</span>` : ''}
+          </div>
+
+          <div class="mono" style="margin-top:4px" title="${esc(hop.wallet)}">
+            ${esc(short(hop.wallet))}
+          </div>
+
+          <div class="sub" style="margin-top:5px">
+            ${esc(hop.directionText)}
+          </div>
+
+          <div class="sub">
+            ${esc(txTime(t))}
+          </div>
+
+          <div style="margin-top:4px;font-weight:600">
+            ${eth(t?.value)} ETH
+          </div>
+
+          <div class="mono sub" style="margin-top:4px" title="${esc(t?.hash||'')}">
+            TX: ${esc(short(t?.hash))}
+          </div>
+
+          <div style="margin-top:8px;color:var(--teal);font-size:11px">
+            ${relLabel}
+          </div>
+        </div>
+      `;
+    }).join('');
 
     return `
-      <div style="margin-bottom:18px">
-
-        <div class="sub" style="margin-bottom:8px">
-          Path ${index+1} · 1 hop
+      <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--line)">
+        <div class="sub" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+          <span><b>Path ${pathIndex+1}</b> · ${pathLabel} · <span style="color:var(--text)">${overallDirection}</span></span>
         </div>
 
         <div class="path">
-
-          <div class="node">
+          <div class="node" style="min-width:130px">
             <b>ROOT</b>
-            <div class="mono">${esc(short(root))}</div>
+            <div class="mono" title="${esc(root)}">${esc(short(root))}</div>
+            <div class="sub" style="margin-top:5px">Subject</div>
           </div>
 
-          <div class="arrow">${arrow}</div>
-
-          <div class="node" style="min-width:260px">
-
-            <div>
-              <b>Hop 1</b>
-            </div>
-
-            <div class="mono">
-              ${esc(short(relationship.counterparty))}
-            </div>
-
-            <div class="sub" style="margin-top:5px">
-              ${directionText}
-            </div>
-
-            <div class="sub">
-              ${esc(txTime(t))}
-            </div>
-
-            <div style="margin-top:4px">
-              ${eth(t.value)} ETH
-            </div>
-
-            <div class="mono sub" style="margin-top:4px">
-              TX: ${esc(t.hash||'—')}
-            </div>
-
-            <div style="margin-top:8px;color:var(--teal)">
-              ${relationshipLabel}
-            </div>
-
-          </div>
-
+          ${hopsHtml}
         </div>
-
       </div>
     `;
   }).join('');
