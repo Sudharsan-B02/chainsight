@@ -1,14 +1,367 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ChainSight — Crypto Intelligence & Investigation</title>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ChainSight — Crypto Intelligence & Investigation</title>
 <style>
-:root{--bg:#071018;--panel:#0d1923;--line:#223546;--text:#e8f0f6;--muted:#91a4b4;--accent:#55d6be;--warn:#ffbd59;--danger:#ff647c}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0,#102536,#071018 42%,#050b10);color:var(--text);font:14px system-ui,-apple-system,Segoe UI,sans-serif}.app{display:flex;min-height:100vh}.side{width:230px;position:fixed;inset:0 auto 0 0;background:#08121a;border-right:1px solid var(--line);padding:22px 15px}.logo{font-size:22px;font-weight:800}.logo span{color:var(--accent)}.sub,.hint{color:var(--muted);font-size:11px}.sub{margin:5px 0 25px}.nav button{display:block;width:100%;border:0;background:transparent;color:#a9bac8;text-align:left;padding:11px;border-radius:8px;margin:3px 0;cursor:pointer}.nav button.active,.nav button:hover{background:#132533;color:#fff}.nav small{display:block;color:#5f7484;margin:20px 10px 7px;text-transform:uppercase}.footer{position:absolute;bottom:20px;color:#667c8d;font-size:10px;line-height:1.6}.main{margin-left:230px;width:calc(100% - 230px);padding:24px}.top{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:18px}.title h1{margin:0;font-size:24px}.badge{border:1px solid #275047;background:#0d2b27;color:var(--accent);padding:8px 11px;border-radius:20px;font-size:11px}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}.card,.panel{background:linear-gradient(#0d1923,#0b151e);border:1px solid var(--line);border-radius:11px}.card{padding:15px}.label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}.value{font-size:24px;font-weight:800;margin-top:6px}.red{color:var(--danger)}.green{color:var(--accent)}.grid{display:grid;grid-template-columns:1.7fr .8fr;gap:14px}.panel{padding:15px}.panel h2{font-size:15px;margin:0 0 5px}.controls{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}.controls input,.controls select{flex:1;background:#08131c;border:1px solid var(--line);color:#dbe6ee;border-radius:7px;padding:10px}.btn{background:#123c38;border:1px solid #286a5e;color:#dffbf5;border-radius:7px;padding:9px 13px;cursor:pointer}.btn:hover{filter:brightness(1.15)}.btn.secondary{background:#15232e;border-color:#304553;color:#c7d4dc}.btn.danger{background:#3a1821;border-color:#673040}.view{display:none}.view.active{display:block}#graph{height:500px;border:1px solid #1b2c39;border-radius:9px;background:radial-gradient(circle,#0c1b26,#071018 70%);overflow:hidden}svg{width:100%;height:100%}.svgtext{font-size:10px;fill:#dce8ef}.edgeLabel{font-size:9px;fill:#7f9caf}.risk{padding:13px;border:1px solid var(--line);border-radius:8px;background:#0a141d}.riskTop{display:flex;justify-content:space-between}.pill,.status{font-size:10px;padding:4px 7px;border-radius:9px}.high{background:#421d27;color:#ffdce2}.medium{background:#3b2b14;color:#ffe8bf}.low{background:#10342e;color:#c8fff3}.bar{height:6px;background:#1b2a35;border-radius:4px;margin:10px 0}.bar i{display:block;height:100%;background:var(--danger);border-radius:4px}.kv{display:grid;grid-template-columns:1fr 1fr;gap:7px}.kv div{background:#0b1821;border:1px solid #1a2b37;border-radius:7px;padding:8px}.kv b{display:block;font-size:12px}.kv span{font-size:10px;color:var(--muted)}.tableWrap{overflow:auto}.tableWrap table{width:100%;border-collapse:collapse;font-size:11px;min-width:850px}.tableWrap th,.tableWrap td{text-align:left;padding:9px;border-bottom:1px solid #1b2b37;white-space:nowrap}.tableWrap th{color:#8fa4b4}.tableWrap td{color:#d3dfe7}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.status.high{background:#421d27;color:#ffb6c1}.status.medium{background:#3b2b14;color:#ffd88e}.status.low{background:#10342e;color:#a9f7e8}.alert{padding:10px;border-left:3px solid var(--danger);background:#171219;border-radius:6px;margin:8px 0;font-size:11px}.alert b{display:block;margin-bottom:3px}.case-list{display:grid;gap:10px}.case-row{display:grid;grid-template-columns:1.2fr 2fr .7fr .8fr auto;gap:10px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:9px;background:#0a141d}.case-row:hover{border-color:#386072}.empty{padding:20px;text-align:center;color:var(--muted)}.notice{padding:11px;border:1px solid #365063;background:#0b1821;border-radius:8px;margin-bottom:12px}.provenance{font-size:11px;color:#aebdc7}.provenance b{color:#e8f0f6}.case-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.modal{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;padding:20px;z-index:10}.modal.open{display:flex}.modal-card{width:min(900px,100%);max-height:90vh;overflow:auto;background:#0b151e;border:1px solid var(--line);border-radius:12px;padding:18px}.modal-close{float:right}.small{font-size:10px}@media(max-width:900px){.side{width:185px}.main{margin-left:185px;width:calc(100% - 185px)}.grid,.two{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}.case-row{grid-template-columns:1fr 1fr}}@media(max-width:600px){.side{display:none}.main{margin:0;width:100%;padding:15px}.cards{grid-template-columns:1fr 1fr}.top{align-items:flex-start}.case-row{grid-template-columns:1fr}}
-</style></head>
-<body><div class="app"><aside class="side"><div class="logo">Chain<span>Sight</span></div><div class="sub">Crypto Intelligence & Investigation</div><div class="nav"><button class="active" onclick="showView('dashboard',this)">◈ Dashboard</button><button onclick="showView('investigate',this)">⌕ Investigate</button><button onclick="showView('cases',this)">▣ Cases</button><button onclick="showView('alerts',this)">⚠ Alerts</button><button onclick="showView('reports',this)">▤ Reports</button><small>System</small><button onclick="showView('method',this)">ⓘ Methodology</button></div><div class="footer">Stage 8D · Case Management<br>Live Ethereum · Blockscout<br>Evidence provenance enabled</div></aside>
-<main class="main">
-<section id="dashboard" class="view active"><div class="top"><div class="title"><h1>Investigation Dashboard</h1><p id="dashSub">Run a live trace to begin.</p></div><div id="liveBadge" class="badge">● API READY</div></div><div class="cards"><div class="card"><div class="label">Wallets traced</div><div id="statNodes" class="value">—</div></div><div class="card"><div class="label">Transactions</div><div id="statTx" class="value">—</div></div><div class="card"><div class="label">Risk alerts</div><div id="statAlerts" class="value red">—</div></div><div class="card"><div class="label">Value observed</div><div id="statValue" class="value">—</div></div></div><div class="grid"><div class="panel"><h2>Transaction Spider Map</h2><div class="hint">Backend-generated transaction graph. Click a wallet.</div><div id="graph"><svg id="svg" viewBox="0 0 760 500"></svg></div></div><div><div class="panel"><h2>Selected Wallet</h2><div id="walletBox" class="risk"><div class="hint">No case loaded.</div></div></div><div class="panel" style="margin-top:12px"><h2>Live Indicators</h2><div id="patternBox" class="hint">No case loaded.</div></div></div></div><div class="panel" style="margin-top:14px"><h2>Transaction Evidence</h2><div class="hint">On-chain facts returned by the backend.</div><div class="tableWrap"><table><thead><tr><th>Timestamp</th><th>Transaction</th><th>From</th><th>To</th><th>Amount</th><th>Risk</th></tr></thead><tbody id="txTable"></tbody></table></div></div></section>
-<section id="investigate" class="view"><div class="top"><div class="title"><h1>Investigate</h1><p>Trace an Ethereum wallet or transaction hash.</p></div></div><div class="panel"><div class="controls"><input id="query" placeholder="0x wallet address or transaction hash"><select id="depth"><option value="1">1 hop</option><option value="2">2 hops</option><option selected value="3">3 hops</option></select><button class="btn" onclick="runInvestigation()">Run Live Trace</button><button class="btn secondary" onclick="loadDemo()">Demo</button></div><div id="traceStatus" class="notice" style="display:none"></div><div id="investigationResult" style="display:none"><div class="cards"><div class="card"><div class="label">Trace depth</div><div id="liveDepth" class="value">—</div></div><div class="card"><div class="label">Nodes</div><div id="liveNodes" class="value">—</div></div><div class="card"><div class="label">Alerts</div><div id="liveAlerts" class="value red">—</div></div><div class="card"><div class="label">Root risk</div><div id="liveRisk" class="value red">—</div></div></div><button class="btn" onclick="saveCurrentCase()">Save Investigation as Case</button><span id="saveStatus" class="hint" style="margin-left:8px"></span></div></div></section>
-<section id="cases" class="view"><div class="top"><div class="title"><h1>Investigation Cases</h1><p>Persistent Stage 8D cases, evidence counts and provenance.</p></div><button class="btn" onclick="loadCases()">Refresh</button></div><div class="panel"><div id="caseList" class="case-list"><div class="empty">Loading cases…</div></div></div></section>
-<section id="alerts" class="view"><div class="top"><div class="title"><h1>Risk Alerts</h1><p>Indicators returned by the backend risk engine.</p></div></div><div class="panel"><div id="alertsList"><div class="empty">No case loaded.</div></div></div></section>
-<section id="reports" class="view"><div class="top"><div class="title"><h1>Investigation Report</h1><p>Current case summary and evidence provenance.</p></div><button class="btn" onclick="downloadReport()">Export HTML Report</button></div><div id="reportContent" class="panel"><div class="case-head"><div><h2>ChainSight Investigation Case</h2><div class="hint">Current in-memory investigation.</div></div><span id="reportCase" class="badge">UNSAVED</span></div><div class="two" style="margin-top:12px"><div class="card"><div class="label">Subject</div><div id="reportSubject" class="mono">—</div></div><div class="card"><div class="label">Risk</div><div id="reportRisk">—</div></div><div class="card"><div class="label">Trace</div><div id="reportTrace">—</div></div><div class="card"><div class="label">Evidence</div><div id="reportEvidence">—</div></div></div><h2 style="margin-top:18px">Evidence Boundary</h2><p class="hint">On-chain records establish transaction facts. IP/identity correlation is not inferred from a transaction hash and requires separate lawful, authorized off-chain intelligence.</p></div></section>
-<section id="method" class="view"><div class="top"><div class="title"><h1>Methodology</h1><p>Research-grounded architecture and limitations.</p></div></div><div class="panel" style="line-height:1.75;color:#b8c8d4"><h2>Stage 8D architecture</h2><p><b>Ethereum / Blockscout → FastAPI → normalization → graph → explainable risk → persistent case → evidence provenance → report.</b></p><h2>Case persistence</h2><p>SQLite stores investigation metadata, transactions, risk indicators and evidence references. Each transaction receives an evidence identifier and retrieval timestamp.</p><h2>Risk source of truth</h2><p>The backend is authoritative for risk scores and risk factors. The frontend only renders backend results; it no longer recalculates the investigation risk.</p><h2>Limitations</h2><p>Risk is an investigative prioritization signal, not proof of criminal conduct. A blockchain transaction does not inherently expose a user's IP address. Identity correlation requires separate lawful, authorized off-chain intelligence.</p></div></section>
-</main></div><div id="caseModal" class="modal"><div class="modal-card"><button class="btn secondary modal-close" onclick="closeCase()">Close</button><div id="caseDetail"></div></div></div><script src="app.js"></script></body></html>
+:root{
+  --bg:#071018;--panel:#0d1923;--panel-sub:#08131c;--line:#223546;--text:#e8f0f6;
+  --muted:#91a4b4;--accent:#55d6be;--warn:#ffbd59;--danger:#ff647c;--accent-bg:#0d2b27;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:radial-gradient(circle at 20% 0,#102536,#071018 42%,#050b10);
+  color:var(--text);
+  font:14px system-ui,-apple-system,Segoe UI,sans-serif;
+}
+.app{display:flex;min-height:100vh}
+.side{
+  width:240px;position:fixed;inset:0 auto 0 0;background:#08121a;border-right:1px solid var(--line);
+  padding:22px 15px;display:flex;flex-direction:column;
+}
+.logo{font-size:22px;font-weight:800;letter-spacing:-0.5px}
+.logo span{color:var(--accent)}
+.sub,.hint{color:var(--muted);font-size:11px}
+.sub{margin:5px 0 22px}
+.nav button, .nav a.nav-link{
+  display:block;width:100%;border:0;background:transparent;color:#a9bac8;text-align:left;
+  padding:10px 12px;border-radius:8px;margin:3px 0;cursor:pointer;font-size:13px;
+  text-decoration:none;
+}
+.nav button.active, .nav button:hover, .nav a.nav-link:hover{
+  background:#132533;color:#fff;
+}
+.nav a.nav-link.highlight{
+  border:1px solid #275047;background:#0a1e1b;color:var(--accent);margin-top:6px;
+}
+.nav small{display:block;color:#5f7484;margin:18px 10px 7px;text-transform:uppercase;font-size:10px;letter-spacing:1px}
+.footer{margin-top:auto;color:#667c8d;font-size:10px;line-height:1.6;padding-top:14px;border-top:1px solid #162430}
+.main{margin-left:240px;width:calc(100% - 240px);padding:24px}
+.top{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.title h1{margin:0;font-size:24px;font-weight:700}
+.badge{border:1px solid #275047;background:var(--accent-bg);color:var(--accent);padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600}
+.badge.warn{border-color:#533d1b;background:#2b2010;color:var(--warn)}
+.badge.danger{border-color:#5a232e;background:#30131a;color:var(--danger)}
+
+/* Quick search bar */
+.search-card{
+  background:#0c1924;border:1px solid #263d50;border-radius:10px;padding:12px 14px;margin-bottom:16px;
+  box-shadow:0 4px 16px rgba(0,0,0,0.3);
+}
+.search-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.search-row input{
+  flex:1;min-width:280px;background:#061018;border:1px solid var(--line);color:#dbe6ee;
+  border-radius:7px;padding:10px 12px;font-size:13px;
+}
+.search-row input:focus{outline:none;border-color:var(--accent)}
+.search-row select{
+  background:#061018;border:1px solid var(--line);color:#dbe6ee;border-radius:7px;padding:10px;font-size:13px;
+}
+.presets{display:flex;gap:6px;align-items:center;margin-top:9px;flex-wrap:wrap;font-size:11px}
+.preset-tag{
+  background:#132533;border:1px solid #223c50;color:#c1d5e3;border-radius:6px;
+  padding:4px 8px;cursor:pointer;font-size:11px;
+}
+.preset-tag:hover{background:#1c3447;color:var(--accent);border-color:var(--accent)}
+
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+.card,.panel{background:linear-gradient(#0d1923,#0b151e);border:1px solid var(--line);border-radius:11px}
+.card{padding:15px}
+.label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.value{font-size:24px;font-weight:800;margin-top:6px}
+.red{color:var(--danger)}.green{color:var(--accent)}
+.grid{display:grid;grid-template-columns:1.7fr .8fr;gap:14px}
+.panel{padding:15px}
+.panel h2{font-size:15px;margin:0 0 5px}
+.controls{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+.btn{
+  background:#123c38;border:1px solid #286a5e;color:#dffbf5;border-radius:7px;padding:9px 14px;
+  cursor:pointer;font-size:13px;font-weight:600;
+}
+.btn:hover{filter:brightness(1.15)}
+.btn.secondary{background:#15232e;border-color:#304553;color:#c7d4dc}
+.btn.secondary:hover{background:#1f3342}
+.btn.danger{background:#3a1821;border-color:#673040}
+.view{display:none}
+.view.active{display:block}
+#graph{
+  height:480px;border:1px solid #1b2c39;border-radius:9px;background:radial-gradient(circle,#0c1b26,#071018 70%);
+  overflow:hidden;position:relative;
+}
+svg{width:100%;height:100%}
+.svgtext{font-size:10px;fill:#dce8ef;font-weight:600}
+.edgeLabel{font-size:9px;fill:#7f9caf}
+.risk{padding:13px;border:1px solid var(--line);border-radius:8px;background:#0a141d}
+.riskTop{display:flex;justify-content:space-between;align-items:center}
+.pill,.status{font-size:10px;padding:4px 8px;border-radius:9px;font-weight:700}
+.high,.critical{background:#421d27;color:#ffdce2}
+.medium{background:#3b2b14;color:#ffe8bf}
+.low{background:#10342e;color:#c8fff3}
+.bar{height:6px;background:#1b2a35;border-radius:4px;margin:10px 0}
+.bar i{display:block;height:100%;background:var(--danger);border-radius:4px;transition:width .3s}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.kv div{background:#0b1821;border:1px solid #1a2b37;border-radius:7px;padding:8px}
+.kv b{display:block;font-size:13px}
+.kv span{font-size:10px;color:var(--muted)}
+.tableWrap{overflow:auto;max-height:400px}
+.tableWrap table{width:100%;border-collapse:collapse;font-size:11px;min-width:850px}
+.tableWrap th,.tableWrap td{text-align:left;padding:9px;border-bottom:1px solid #1b2b37;white-space:nowrap}
+.tableWrap th{color:#8fa4b4;position:sticky;top:0;background:#0b151e}
+.tableWrap td{color:#d3dfe7}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.alert{padding:10px;border-left:3px solid var(--danger);background:#171219;border-radius:6px;margin:8px 0;font-size:11px}
+.alert b{display:block;margin-bottom:3px}
+.case-list{display:grid;gap:10px}
+.case-row{
+  display:grid;grid-template-columns:1.2fr 2fr .7fr .8fr auto;gap:10px;align-items:center;padding:12px;
+  border:1px solid var(--line);border-radius:9px;background:#0a141d;
+}
+.case-row:hover{border-color:#386072}
+.empty{padding:20px;text-align:center;color:var(--muted)}
+.notice{padding:11px;border:1px solid #365063;background:#0b1821;border-radius:8px;margin-bottom:12px}
+.provenance{font-size:11px;color:#aebdc7}
+.provenance b{color:#e8f0f6}
+.case-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modal{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;padding:20px;z-index:100}
+.modal.open{display:flex}
+.modal-card{width:min(900px,100%);max-height:90vh;overflow:auto;background:#0b151e;border:1px solid var(--line);border-radius:12px;padding:18px}
+.modal-close{float:right}
+.small{font-size:10px}
+@media(max-width:900px){
+  .side{width:185px}.main{margin-left:185px;width:calc(100% - 185px)}
+  .grid,.two{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}
+  .case-row{grid-template-columns:1fr 1fr}
+}
+@media(max-width:600px){
+  .side{display:none}.main{margin:0;width:100%;padding:15px}
+  .cards{grid-template-columns:1fr 1fr}.top{align-items:flex-start}
+  .case-row{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="logo">Chain<span>Sight</span></div>
+    <div class="sub">Crypto Intelligence & Investigation</div>
+    <div class="nav">
+      <button class="active" onclick="showView('dashboard',this)">◈ Dashboard</button>
+      <button onclick="showView('investigate',this)">⌕ Investigate</button>
+      <button onclick="showView('cases',this)">▣ Cases</button>
+      <button onclick="showView('alerts',this)">⚠ Alerts</button>
+      <button onclick="showView('reports',this)">▤ Reports</button>
+      <small>Advanced Workspace</small>
+      <a href="stage8e.html" class="nav-link highlight">🔬 Stage 8E Workspace ↗</a>
+      <small>System</small>
+      <button onclick="showView('method',this)">ⓘ Methodology</button>
+    </div>
+    <div class="footer">
+      ChainSight v0.3.0<br>
+      Live Ethereum · Blockscout<br>
+      Graph & Heuristic Engine Active
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- DASHBOARD VIEW -->
+    <section id="dashboard" class="view active">
+      <div class="top">
+        <div class="title">
+          <h1>Investigation Dashboard</h1>
+          <p id="dashSub">Live Ethereum investigation & spider graph visualization.</p>
+        </div>
+        <div id="liveBadge" class="badge">● READY</div>
+      </div>
+
+      <!-- Quick Investigation Bar -->
+      <div class="search-card">
+        <div class="search-row">
+          <input id="dashQuery" placeholder="Enter Ethereum wallet address (0x...) or transaction hash" value="0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045">
+          <select id="dashDepth">
+            <option value="1">1 hop</option>
+            <option value="2">2 hops</option>
+            <option selected value="3">3 hops</option>
+          </select>
+          <button class="btn" onclick="runInvestigationFromDash()">Run Live Trace</button>
+          <button class="btn secondary" onclick="loadDemo()">Demo Scenario</button>
+        </div>
+        <div class="presets">
+          <span class="sub">Quick Presets:</span>
+          <span class="preset-tag" onclick="setAndRunTrace('0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045')">vitalik.eth (0xd8da6…)</span>
+          <span class="preset-tag" onclick="setAndRunTrace('0xd90e2f925da726b50c4ed8d0fb90ad053324f31b')">Tornado Cash Router</span>
+          <span class="preset-tag" onclick="setAndRunTrace('0x28c6c06298d514db089934071355e5743bf21d60')">Binance 14 Hot Wallet</span>
+          <span class="preset-tag" onclick="loadDemo()">Interactive Demo Graph</span>
+        </div>
+        <div id="dashTraceStatus" class="notice" style="display:none;margin-top:10px"></div>
+      </div>
+
+      <div class="cards">
+        <div class="card"><div class="label">Wallets Traced</div><div id="statNodes" class="value">—</div></div>
+        <div class="card"><div class="label">Transactions</div><div id="statTx" class="value">—</div></div>
+        <div class="card"><div class="label">Risk Alerts</div><div id="statAlerts" class="value red">—</div></div>
+        <div class="card"><div class="label">Value Observed</div><div id="statValue" class="value">—</div></div>
+      </div>
+
+      <div class="grid">
+        <div class="panel">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div>
+              <h2>Transaction Spider Map</h2>
+              <div class="hint">Interactive graph of counterparties and token/ETH flows. Click any wallet node.</div>
+            </div>
+          </div>
+          <div id="graph"><svg id="svg" viewBox="0 0 760 480"></svg></div>
+        </div>
+
+        <div>
+          <div class="panel">
+            <h2>Selected Wallet</h2>
+            <div id="walletBox" class="risk"><div class="hint">Click a wallet node in the graph.</div></div>
+          </div>
+          <div class="panel" style="margin-top:12px">
+            <h2>Risk Indicators & Patterns</h2>
+            <div id="patternBox" class="hint">No risk indicators for current selection.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h2>Transaction Evidence Ledger</h2>
+          <button class="btn secondary" style="padding:4px 10px;font-size:11px" onclick="saveCurrentCase()">Save as Case</button>
+        </div>
+        <div class="hint" style="margin-bottom:10px">On-chain transaction facts retrieved and normalized from Ethereum mainnet.</div>
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr><th>Timestamp</th><th>Transaction</th><th>From</th><th>To</th><th>Amount</th><th>Status</th></tr>
+            </thead>
+            <tbody id="txTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- INVESTIGATE VIEW -->
+    <section id="investigate" class="view">
+      <div class="top">
+        <div class="title">
+          <h1>Investigate</h1>
+          <p>Trace an Ethereum wallet or transaction hash across multi-hop counterparties.</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="controls">
+          <input id="query" placeholder="0x wallet address or transaction hash">
+          <select id="depth">
+            <option value="1">1 hop</option>
+            <option value="2">2 hops</option>
+            <option selected value="3">3 hops</option>
+          </select>
+          <button class="btn" onclick="runInvestigation()">Run Live Trace</button>
+          <button class="btn secondary" onclick="loadDemo()">Demo</button>
+        </div>
+        <div id="traceStatus" class="notice" style="display:none"></div>
+        <div id="investigationResult" style="display:none;margin-top:16px">
+          <div class="cards">
+            <div class="card"><div class="label">Trace depth</div><div id="liveDepth" class="value">—</div></div>
+            <div class="card"><div class="label">Nodes</div><div id="liveNodes" class="value">—</div></div>
+            <div class="card"><div class="label">Alerts</div><div id="liveAlerts" class="value red">—</div></div>
+            <div class="card"><div class="label">Root risk</div><div id="liveRisk" class="value red">—</div></div>
+          </div>
+          <button class="btn" onclick="saveCurrentCase()">Save Investigation as Case</button>
+          <button class="btn secondary" style="margin-left:8px" onclick="showView('dashboard',document.querySelector('.nav button'))">View on Spider Map</button>
+          <span id="saveStatus" class="hint" style="margin-left:8px"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- CASES VIEW -->
+    <section id="cases" class="view">
+      <div class="top">
+        <div class="title">
+          <h1>Investigation Cases</h1>
+          <p>Persistent cases, evidence records, and chain-of-custody tracking.</p>
+        </div>
+        <button class="btn" onclick="loadCases()">Refresh</button>
+      </div>
+      <div class="panel">
+        <div id="caseList" class="case-list"><div class="empty">Loading cases…</div></div>
+      </div>
+    </section>
+
+    <!-- ALERTS VIEW -->
+    <section id="alerts" class="view">
+      <div class="top">
+        <div class="title">
+          <h1>Risk Alerts & Heuristics</h1>
+          <p>Explainable risk indicators computed for observed counterparties.</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div id="alertsList"><div class="empty">No case loaded.</div></div>
+      </div>
+    </section>
+
+    <!-- REPORTS VIEW -->
+    <section id="reports" class="view">
+      <div class="top">
+        <div class="title">
+          <h1>Investigation Report</h1>
+          <p>Comprehensive investigation dossier and evidence provenance.</p>
+        </div>
+        <button class="btn" onclick="downloadReport()">Export HTML Report</button>
+      </div>
+      <div id="reportContent" class="panel">
+        <div class="case-head">
+          <div>
+            <h2>ChainSight Investigation Dossier</h2>
+            <div class="hint">Current active investigation evidence.</div>
+          </div>
+          <span id="reportCase" class="badge">UNSAVED</span>
+        </div>
+        <div class="two" style="margin-top:12px">
+          <div class="card"><div class="label">Subject</div><div id="reportSubject" class="mono">—</div></div>
+          <div class="card"><div class="label">Risk</div><div id="reportRisk">—</div></div>
+          <div class="card"><div class="label">Trace</div><div id="reportTrace">—</div></div>
+          <div class="card"><div class="label">Evidence</div><div id="reportEvidence">—</div></div>
+        </div>
+        <h2 style="margin-top:18px">Evidence Boundary</h2>
+        <p class="hint">On-chain records establish public cryptographic transaction facts. Identity correlation requires separate lawful, authorized off-chain intelligence.</p>
+      </div>
+    </section>
+
+    <!-- METHODOLOGY VIEW -->
+    <section id="method" class="view">
+      <div class="top">
+        <div class="title">
+          <h1>Methodology & Limitations</h1>
+          <p>Research-grounded blockchain intelligence architecture.</p>
+        </div>
+      </div>
+      <div class="panel" style="line-height:1.75;color:#b8c8d4">
+        <h2>Architecture Pipeline</h2>
+        <p><b>Ethereum Mainnet (Blockscout API) → Graph Normalization → Topological Spider Layout → Multi-Factor Risk Heuristics → Case Ledger.</b></p>
+        <h2>Risk Heuristic Engine</h2>
+        <p>The risk engine evaluates counterparty fan-out, high-velocity transactions (<2 min intervals), peel chains, and volume concentration. Risk scores prioritize investigative review and do not constitute legal determinations.</p>
+        <h2>Evidence Integrity</h2>
+        <p>Every transaction record is hashed and timestamped into an evidence ledger (EV-0001...) ensuring full forensic provenance.</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Modal -->
+<div id="caseModal" class="modal">
+  <div class="modal-card">
+    <button class="btn secondary modal-close" onclick="closeCase()">Close</button>
+    <div id="caseDetail"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
