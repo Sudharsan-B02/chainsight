@@ -22,8 +22,10 @@ TX_RE = re.compile(r"^0x[a-fA-F0-9]{64}$")
 app = FastAPI(title="ChainSight Intelligence API", version="0.3.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "https://sudharsan-b02.github.io,http://localhost:8000,http://localhost:5500").split(","),
-    allow_credentials=False,
+allow_origins=os.getenv(
+    "CORS_ORIGINS",
+    "https://sudharsan-b02.github.io,https://chainsight-blue.vercel.app,http://localhost:8000,http://localhost:5500,http://127.0.0.1:5500"
+).split(","),    allow_credentials=False,
     allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
