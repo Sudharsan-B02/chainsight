@@ -1,0 +1,8 @@
+﻿.venv/
+__pycache__/
+*.py[cod]
+chainsight.db
+*.db
+.env
+.env.*
+!.env.example
