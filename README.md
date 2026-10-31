@@ -1,34 +1,28 @@
-# ChainSight — Crypto Intelligence & Investigation Platform
-
-Live-upgrade package for the ChainSight hackathon prototype.
-
-## What changed
-
-- Live Ethereum wallet transaction retrieval via Blockscout API
-- 1–3 hop wallet tracing
-- Directed transaction spider map
-- Explainable risk heuristics
-- Live transaction evidence table
-- Risk alerts
-- Investigation report export
-
-## Deployment
-
-Upload `index.html`, `app.js`, and `README.md` to the root of the
-`Sudharsan-B02/chainsight` repository and commit to `main`.
-
-GitHub Pages can continue using `main` + `/ (root)`.
-
-## Important limitations
-
-The browser implementation retrieves public Ethereum on-chain data. The
-risk score is an investigative prioritization signal, not proof of criminal
-conduct.
-
-A blockchain transaction does not inherently reveal a user's IP address.
-Any IP/identity correlation requires separate lawful, authorized off-chain
-intelligence.
-
-The next production stage should add a FastAPI backend, persistent database,
-authentication/rate limiting, provenance logging, and the GCN/GAT research
-pipeline.
+ChainSight — GitHub Recovery Bundle
+This bundle gathers the ChainSight files that were available in the saved backups. It preserves the original ZIP archives and unpacks each archive into a separate folder so different stages do not overwrite one another.
+Contents
+- core_files/ — convenience copies of the Stage 8D main.py, app.js, and index.html.
+- archives_original/ — original saved ZIP backups, unchanged.
+- recovered_versions/ — each ZIP unpacked in its own folder, plus standalone HTML snapshots.
+- reference_material/ — the saved Sample BE Project PPT.pptx template. This is a reference template, not a confirmed ChainSight presentation.
+Important notes
+- This is a source-file recovery bundle, not a recovery of the old GitHub repository's commit history, branches, issues, secrets, or settings. Those require GitHub account/repository recovery or a local .git copy.
+- Some backups contain older versions of files with the same names. Compare versions before deciding which one to deploy. Do not blindly combine all versions into one application.
+- The Stage 8E snapshots are preserved separately; they may expect the configured API endpoint to be available.
+- Never commit API keys, passwords, private keys, .env files, or real user data.
+Create a new GitHub repository (Windows PowerShell)
+1. Extract this ZIP to a working folder.
+2. Create an empty repository in the new GitHub account. Do not initialize it with a README if you plan to push this folder as-is.
+3. Open PowerShell in the extracted ChainSight-GitHub-Recovery folder.
+4. Run:
+git init
+git add .
+git commit -m "Restore ChainSight project files"
+git branch -M main
+git remote add origin https://github.com/YOUR-NEW-USERNAME/YOUR-NEW-REPO.git
+git push -u origin main
+Replace YOUR-NEW-USERNAME and YOUR-NEW-REPO with the new account and repository names. GitHub may ask you to authenticate in a browser.
+Run the backend version
+Inspect recovered_versions/ChainSight-Backend-Stage2/README.md and its requirements.txt first. That version includes Docker files and app/main.py. The Stage 8D chainsight/main.py is a different saved version; check its imports and requirements before running.
+File inventory
+The original archives are retained in archives_original/; their contents are extracted into matching folders under recovered_versions/.
